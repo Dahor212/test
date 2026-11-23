@@ -480,7 +480,9 @@ async function main() {
       const dev = devices['iPad Pro 11 landscape'] || devices['iPad (gen 7) landscape'];
       const { page, ctx } = await newPage(browser, { device: dev, timescale: 1 });
       await startRace(page, solo, 1234);
-      await page.waitForFunction(() => window.__race.engine.state.phase === 'racing', null, { timeout: 20000 });
+      // software WebGL at device pixel ratio 2 draws only ~1–2 frames/s here and the
+      // loop clamps a frame to 0.1 s, so the countdown needs real time (a real iPad runs 60 fps)
+      await page.waitForFunction(() => window.__race.engine.state.phase === 'racing', null, { timeout: 90000 });
       const m = await page.evaluate(() => {
         const view = document.querySelector('.race-view').getBoundingClientRect();
         const btn = document.querySelector('.dino-btn').getBoundingClientRect();
