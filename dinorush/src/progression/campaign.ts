@@ -114,10 +114,14 @@ export function nextLevel(level: CampaignLevel): CampaignLevel | null {
 /** AI strength of a place relative to the chosen difficulty. */
 export function levelAiProfiles(level: CampaignLevel, difficulty: DifficultyId): AIProfileId[] {
   const base = DIFFICULTIES[difficulty].aiProfiles;
-  const up: Record<AIProfileId, AIProfileId> = { rookie: 'beginner', beginner: 'advanced', advanced: 'champion', champion: 'champion' };
+  const up: Record<AIProfileId, AIProfileId> = { baby: 'rookie', rookie: 'beginner', beginner: 'advanced', advanced: 'champion', champion: 'champion' };
+  // places that teach a new dinosaur have the gentlest opponents
+  if (level.ai === 'easy' && level.style === 'teach') return base.map((p) => (p === 'champion' ? 'rookie' : 'baby'));
   if (level.ai === 'easy') return base.map((p) => (p === 'champion' ? 'beginner' : 'rookie'));
   if (level.ai === 'hard') return base.map((p, i) => (i % 2 === 0 ? up[p] : p));
-  return [...base];
+  // normal career places: two of the four rivals are a notch gentler than in quick races
+  const down: Record<AIProfileId, AIProfileId> = { baby: 'baby', rookie: 'baby', beginner: 'rookie', advanced: 'beginner', champion: 'advanced' };
+  return base.map((p, i) => (i % 2 === 1 ? down[p] : p));
 }
 
 /** Track length for the chosen difficulty (places are designed for 'racer'). */
@@ -139,6 +143,8 @@ export function levelRaceConfig(level: CampaignLevel, difficulty: DifficultyId):
     context: { kind: 'campaign', levelId: level.id },
     terrainPool: level.terrainPool,
     look: level.look,
+    trackStyle: level.style,
+    focusTerrain: level.focus,
   };
 }
 

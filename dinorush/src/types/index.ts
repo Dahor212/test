@@ -172,6 +172,8 @@ export interface TrackSegment {
   finish?: boolean;
   /** Start straight flag. */
   startArea?: boolean;
+  /** First segment of the final phrase (the HUD announces the finale). */
+  finale?: boolean;
 }
 
 export interface TrackDefinition {
@@ -244,7 +246,7 @@ export interface GameDifficulty {
   trexSpeedFactor: number;
 }
 
-export type AIProfileId = 'rookie' | 'beginner' | 'advanced' | 'champion';
+export type AIProfileId = 'baby' | 'rookie' | 'beginner' | 'advanced' | 'champion';
 
 export interface AIProfile {
   id: AIProfileId;
@@ -439,7 +441,16 @@ export interface RaceConfig {
   look?: WorldLook;
   /** Dinosaur roles available in this race (default: the classic four). */
   roles?: Archetype[];
+  /** Level design: rhythm of the track and its main terrain. */
+  trackStyle?: TrackStyle;
+  focusTerrain?: TerrainId;
 }
+
+/**
+ * Rhythm of a track: flow = balanced, rhythm = many quick switches,
+ * endurance = long hard stretches, teach = calm with long first encounters.
+ */
+export type TrackStyle = 'flow' | 'rhythm' | 'endurance' | 'teach';
 
 export type WorldLook = Partial<Pick<WorldDefinition, 'sky' | 'fog' | 'fogNear' | 'fogFar' | 'ambient' | 'sun' | 'sunIntensity' | 'ground' | 'ground2' | 'weather'>>;
 
@@ -685,6 +696,8 @@ export interface CampaignLevel {
   terrainPool: Partial<Record<TerrainId, number>>;
   look?: WorldLook;
   goals: [StarGoal, StarGoal, StarGoal];
+  style: TrackStyle;
+  focus?: TerrainId;
 }
 
 export interface CampaignState {

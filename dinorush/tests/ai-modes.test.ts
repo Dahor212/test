@@ -5,7 +5,7 @@ import { ai, config, human, lazyBot, perfectBot, simulate, wrongBot } from './he
 
 describe('AI opponents', () => {
   it('make decisions with roughly their configured accuracy', () => {
-    const stats: Record<AIProfileId, [number, number]> = { rookie: [0, 0], beginner: [0, 0], advanced: [0, 0], champion: [0, 0] };
+    const stats: Record<AIProfileId, [number, number]> = { baby: [0, 0], rookie: [0, 0], beginner: [0, 0], advanced: [0, 0], champion: [0, 0] };
     for (let seed = 1; seed <= 12; seed++) {
       const e = new RaceEngine(config({ seed }), [ai('ai0', 'beginner'), ai('ai1', 'advanced'), ai('ai2', 'champion')]);
       simulate(e, {});

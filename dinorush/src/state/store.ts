@@ -336,7 +336,7 @@ class Store {
     let participants = buildParticipants(setup, profile, level.seed, undefined, levelAiProfiles(level, difficulty));
     if (level.boss && level.bossKind === 'rival') {
       // the region champion races as a named rival
-      participants = participants.map((pp) => (pp.id === RIVAL_ID ? { ...pp, name: BOSS_NAMES[level.region].slice(0, 16), color: '#2d3436', aiProfile: 'champion' as const } : pp));
+      participants = participants.map((pp) => (pp.id === RIVAL_ID ? { ...pp, name: BOSS_NAMES[level.region].slice(0, 16), color: '#2d3436', aiProfile: 'beginner' as const } : pp));
     }
     const config: RaceConfig = { ...levelRaceConfig(level, difficulty), roles: this.roles() };
     this.updateProfile((p) => (p.campaign.current = level.id));

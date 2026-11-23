@@ -14,6 +14,7 @@ import type {
   TrackEventSpec,
   TrackObstacle,
   TrackSegment,
+  TrackStyle,
   WorldId,
 } from '../types';
 
@@ -29,7 +30,33 @@ export interface TrackOptions {
   terrainPool?: Partial<Record<TerrainId, number>>;
   /** Dinosaur roles of the race: only terrains for these appear. */
   roles?: Archetype[];
+  /** Rhythm of the track (default: chosen from the seed). */
+  style?: TrackStyle;
+  /** Main terrain of a place: appears more often. */
+  focus?: TerrainId;
 }
+
+/**
+ * Level design: a track is told in phrases, like a song. After the start a
+ * body of phrases repeats (depends on the style) and a quick finale with
+ * shorter segments ends the race before the sprint home.
+ */
+type Phrase = 'steady' | 'quick' | 'long' | 'breather' | 'climax';
+const PHRASES: Record<Phrase, { count: [number, number]; dur: number }> = {
+  steady: { count: [2, 3], dur: 1 },
+  quick: { count: [3, 4], dur: 0.62 },
+  long: { count: [1, 1], dur: 1.6 },
+  breather: { count: [1, 1], dur: 1.45 },
+  climax: { count: [3, 5], dur: 0.72 },
+};
+const BODY: Record<TrackStyle, Phrase[]> = {
+  flow: ['steady', 'breather', 'steady', 'quick'],
+  rhythm: ['quick', 'steady', 'quick', 'breather'],
+  endurance: ['long', 'steady', 'long', 'breather'],
+  teach: ['steady', 'breather', 'steady', 'steady'],
+};
+/** Share of the track (before the finish straight) where the finale starts. */
+const FINALE_AT = 0.8;
 
 /** Terrains that are too demanding for the gentle start of a race. */
 const INTRO_EXCLUDED: TerrainId[] = ['deepWater', 'scree', 'ice', 'chasm'];
@@ -70,7 +97,9 @@ export class TrackGenerator {
   private rng: Rng;
   private pos = 0;
   private recent: TerrainId[] = [];
-  private readonly opts: Required<TrackOptions>;
+  /** Dinosaurs already met on this track (first encounters are longer). */
+  private seenBest = new Set<Archetype>();
+  private readonly opts: Required<Omit<TrackOptions, 'style' | 'focus'>> & Pick<TrackOptions, 'style' | 'focus'>;
   private readonly targetLength: number;
 
   constructor(opts: TrackOptions) {
@@ -158,7 +187,23 @@ export class TrackGenerator {
     return out;
   }
 
-  private chooseTerrain(progress: number): TerrainId {
+  private chooseTerrain(progress: number, want: 'any' | 'firm' | 'hard' = 'any'): TerrainId {
+    const t = this.pickTerrain(progress);
+    if (want === 'any') return t;
+    const prev = this.recent[this.recent.length - 1];
+    const prevBest = TERRAINS[prev].best;
+    const isFirm = (id: TerrainId) => TERRAINS[id].category === 'firm';
+    const pool: Partial<Record<TerrainId, number>> = {};
+    for (const [id, w] of Object.entries(this.opts.terrainPool) as [TerrainId, number][]) {
+      if (id === prev || TERRAINS[id].best === prevBest) continue;
+      if (want === 'firm' ? !isFirm(id) : isFirm(id)) continue;
+      if (progress < this.diff.easyIntro && INTRO_EXCLUDED.includes(id)) continue;
+      pool[id] = w * (id === this.opts.focus ? 2.5 : 1);
+    }
+    return Object.keys(pool).length ? this.rng.weighted(pool) : t;
+  }
+
+  private pickTerrain(progress: number): TerrainId {
     const prev = this.recent[this.recent.length - 1];
     const prevBest = TERRAINS[prev].best;
     const intro = progress < this.diff.easyIntro;
@@ -173,6 +218,7 @@ export class TrackGenerator {
       if (!wantChange && best !== prevBest) continue;
       let weight = w;
       if (recentBest.has(best)) weight *= 0.45;
+      if (id === this.opts.focus) weight *= 2.5;
       pool[id] = weight;
     }
     if (Object.keys(pool).length === 0) {
@@ -184,13 +230,17 @@ export class TrackGenerator {
     return this.rng.weighted(pool);
   }
 
-  private segmentLength(terrain: TerrainId, progress: number, at: number): number {
+  private segmentLength(terrain: TerrainId, progress: number, at: number, phrase = 1): number {
     const d = this.diff;
     const cat = TERRAINS[terrain].category;
     const intro = progress < d.easyIntro;
     const ramp = this.opts.endless ? endlessRamp(at) : 1;
-    let t = this.rng.range(d.segmentTime[0], d.segmentTime[1]);
+    let t = this.rng.range(d.segmentTime[0], d.segmentTime[1]) * phrase;
     if (intro) t *= 1.2;
+    // the first meeting with a dinosaur's terrain is a bit longer (time to learn it)
+    const best = TERRAINS[terrain].best;
+    if (!this.opts.endless && !this.seenBest.has(best)) t *= this.opts.style === 'teach' ? 1.45 : 1.25;
+    this.seenBest.add(best);
     if (cat === 'smash') t *= 0.8;
     // Endless: changes come faster the further you go.
     t /= Math.sqrt(ramp);
@@ -202,18 +252,43 @@ export class TrackGenerator {
   private buildFinite() {
     const total = this.targetLength;
     const finishStart = total - FINISH_STRAIGHT;
+    const style: TrackStyle = this.opts.style ?? this.rng.pick<TrackStyle>(['flow', 'rhythm', 'endurance']);
+    const body = [...BODY[style]];
+    const minLen = this.diff.minSegmentTime * this.nominalSpeed();
+    let phraseIdx = 0;
+    let inFinale = false;
+    let finaleMarked = false;
     let guard = 0;
-    while (guard++ < 500) {
+    outer: while (guard++ < 200) {
       const progress = this.pos / total;
-      const terrain = this.chooseTerrain(progress);
-      const len = this.segmentLength(terrain, progress, this.pos);
-      const minLen = this.diff.minSegmentTime * this.nominalSpeed();
-      if (this.pos + len > finishStart) {
-        const remaining = finishStart - this.pos;
-        if (remaining >= minLen) this.push(terrain, remaining);
-        break;
+      let phrase: Phrase = body[phraseIdx++ % body.length];
+      if (!inFinale && progress >= FINALE_AT * (finishStart / total)) {
+        phrase = 'climax';
+        inFinale = true;
       }
-      this.push(terrain, len);
+      const spec = PHRASES[phrase];
+      const count = this.rng.int(spec.count[0], spec.count[1]);
+      for (let k = 0; k < count; k++) {
+        const pr = this.pos / total;
+        const want = phrase === 'breather' ? 'firm' : phrase === 'long' ? 'hard' : 'any';
+        const terrain = this.chooseTerrain(pr, want);
+        const len = this.segmentLength(terrain, pr, this.pos, spec.dur);
+        if (this.pos + len > finishStart) {
+          const remaining = finishStart - this.pos;
+          if (remaining >= minLen) this.push(terrain, remaining);
+          break outer;
+        }
+        const seg = this.push(terrain, len);
+        if (phrase === 'climax' && !finaleMarked) {
+          seg.finale = true;
+          finaleMarked = true;
+        }
+      }
+      if (inFinale && phrase === 'climax') {
+        // the finale repeats quick phrases until the sprint home
+        phraseIdx = body.length * 100;
+        body.length && body.splice(0, body.length, 'climax');
+      }
     }
     // final straight – always firm so everybody sprints home
     const firm = this.world.firmTerrain;

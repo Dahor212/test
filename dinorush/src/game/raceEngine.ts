@@ -84,6 +84,8 @@ export class RaceEngine {
           length: config.trackLengthOverride,
           terrainPool: config.terrainPool,
           roles: config.roles,
+          style: config.trackStyle,
+          focus: config.focusTerrain,
         });
         t = this.generator.track;
       }

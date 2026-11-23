@@ -1,5 +1,5 @@
 import { hashString } from '../core/rng';
-import type { Archetype, CampaignLevel, CampaignMode, RegionDefinition, RegionId, StarGoal, TerrainId, WorldLook } from '../types';
+import type { Archetype, CampaignLevel, CampaignMode, RegionDefinition, RegionId, StarGoal, TerrainId, TrackStyle, WorldLook } from '../types';
 
 /**
  * Career map ("Dobrodružství"): one island with six regions. Every place is
@@ -132,7 +132,47 @@ interface PlaceSpec {
   pool?: Partial<Record<TerrainId, number>>;
   look?: WorldLook;
   goals?: [StarGoal, StarGoal, StarGoal];
+  style?: TrackStyle;
+  focus?: TerrainId;
 }
+
+/**
+ * Level design of each place: its rhythm and its main terrain. Places that
+ * introduce a new dinosaur role are calm ("teach") and focus on its
+ * terrain; bosses are rhythmic; the fourth place of a region tests stamina.
+ */
+const DESIGN: Record<string, { style: TrackStyle; focus?: TerrainId }> = {
+  'jungle-1': { style: 'teach' },
+  'jungle-2': { style: 'teach', focus: 'water' },
+  'jungle-3': { style: 'teach', focus: 'stones' },
+  'jungle-4': { style: 'endurance', focus: 'woodBarrier' },
+  'jungle-5': { style: 'rhythm' },
+  'swamp-1': { style: 'teach', focus: 'mud' },
+  'swamp-2': { style: 'rhythm', focus: 'water' },
+  'swamp-3': { style: 'flow', focus: 'water' },
+  'swamp-4': { style: 'endurance', focus: 'mud' },
+  'swamp-5': { style: 'flow' },
+  'canyon-1': { style: 'teach', focus: 'sand' },
+  'canyon-2': { style: 'rhythm', focus: 'path' },
+  'canyon-3': { style: 'flow', focus: 'sand' },
+  'canyon-4': { style: 'endurance', focus: 'scree' },
+  'canyon-5': { style: 'flow' },
+  'ice-1': { style: 'teach', focus: 'chasm' },
+  'ice-2': { style: 'rhythm', focus: 'snow' },
+  'ice-3': { style: 'flow', focus: 'snow' },
+  'ice-4': { style: 'endurance', focus: 'ice' },
+  'ice-5': { style: 'rhythm' },
+  'volcano-1': { style: 'teach', focus: 'chasm' },
+  'volcano-2': { style: 'flow', focus: 'bridge' },
+  'volcano-3': { style: 'endurance', focus: 'stones' },
+  'volcano-4': { style: 'rhythm', focus: 'chasm' },
+  'volcano-5': { style: 'rhythm' },
+  'islands-1': { style: 'flow' },
+  'islands-2': { style: 'rhythm', focus: 'water' },
+  'islands-3': { style: 'flow', focus: 'woodBarrier' },
+  'islands-4': { style: 'endurance', focus: 'chasm' },
+  'islands-5': { style: 'flow' },
+};
 
 const race = (third: StarGoal): [StarGoal, StarGoal, StarGoal] => [{ kind: 'place', value: 3 }, { kind: 'place', value: 1 }, third];
 const rival = (third: StarGoal): [StarGoal, StarGoal, StarGoal] => [{ kind: 'rival', value: 1 }, { kind: 'place', value: 1 }, third];
@@ -235,6 +275,8 @@ function buildLevels(): CampaignLevel[] {
         terrainPool: pl.pool ?? reg.terrainPool,
         look: { ...(reg.look ?? {}), ...(pl.look ?? {}) },
         goals: pl.goals ?? race({ kind: 'perfects', value: 2 }),
+        style: DESIGN[id]?.style ?? 'flow',
+        focus: DESIGN[id]?.focus,
       });
     });
   }

@@ -31,7 +31,7 @@ interface Popup {
   id: number;
   pid: string;
   text: string;
-  kind: 'perfect' | 'combo' | 'good' | 'bad' | 'ability' | 'coins' | 'finish' | 'trex' | 'team';
+  kind: 'perfect' | 'combo' | 'good' | 'bad' | 'ability' | 'coins' | 'finish' | 'trex' | 'team' | 'finale';
   born: number;
 }
 
@@ -50,6 +50,7 @@ export function RaceScreen({ session }: { session: RaceSession }) {
   const [prompt, setPrompt] = useState<TutorialPrompt | null>(null);
   const [countdownText, setCountdownText] = useState<string | null>(null);
   const finishedRef = useRef(false);
+  const finaleRef = useRef(false);
 
   // --- create controller -------------------------------------------------
   useEffect(() => {
@@ -105,6 +106,11 @@ export function RaceScreen({ session }: { session: RaceSession }) {
         window.setTimeout(() => setBanner((b) => (b && b.id === now ? null : b)), 3200);
       }
       if (e.type === 'teamTurbo') add.push({ id: ++popupId, pid: '*', text: 'TÝMOVÉ TURBO!', kind: 'team', born: now });
+      // level design: the last phrase of the track is announced once
+      if (e.type === 'enterTerrain' && isHuman(e.participantId) && e.segmentIndex !== undefined && !finaleRef.current && ctrl.engine.state.track.segments[e.segmentIndex]?.finale) {
+        finaleRef.current = true;
+        add.push({ id: ++popupId, pid: '*', text: 'FINÁLE – ještě kousek!', kind: 'finale', born: now });
+      }
       if (!isHuman(e.participantId)) continue;
       const pid = e.participantId!;
       switch (e.type) {

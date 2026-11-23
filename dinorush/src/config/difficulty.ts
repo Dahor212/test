@@ -57,6 +57,15 @@ export const DIFFICULTIES: Record<DifficultyId, GameDifficulty> = {
 export const DIFFICULTY_LIST = Object.values(DIFFICULTIES);
 
 export const AI_PROFILES: Record<AIProfileId, AIProfile> = {
+  /** Very gentle opponents for places that teach a new dinosaur. */
+  baby: {
+    id: 'baby',
+    name: 'Mládě',
+    accuracy: 0.5,
+    reaction: [1.3, 2.1],
+    perfectSkill: 0.05,
+    recovery: [2.0, 3.2],
+  },
   /** Gentle opponents for the first levels of each adventure world. */
   rookie: {
     id: 'rookie',

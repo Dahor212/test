@@ -223,9 +223,12 @@ describe('career map', () => {
   it('ramps AI strength, uses rival champions and fast boss T-Rexes', () => {
     const first = LEVEL_BY_ID['jungle-1'];
     const boss = LEVEL_BY_ID['jungle-5'];
-    expect(levelAiProfiles(first, 'racer').every((p) => p === 'rookie')).toBe(true);
+    // places teaching a new dinosaur have the gentlest rivals, bosses the strongest
+    expect(levelAiProfiles(first, 'racer').every((p) => p === 'baby')).toBe(true);
+    expect(levelAiProfiles(LEVEL_BY_ID['islands-1'], 'racer').every((p) => p === 'rookie')).toBe(true);
     expect(levelAiProfiles(boss, 'racer')).toContain('champion');
-    expect(levelAiProfiles(LEVEL_BY_ID['jungle-4'], 'racer')).toEqual(DIFFICULTIES.racer.aiProfiles);
+    expect(levelAiProfiles(LEVEL_BY_ID['jungle-4'], 'racer')).toEqual(['advanced', 'rookie', 'advanced', 'rookie']);
+    expect(DIFFICULTIES.racer.aiProfiles).toEqual(['advanced', 'beginner', 'advanced', 'beginner']);
     const cfg = levelRaceConfig(boss, 'racer');
     expect(cfg.trexFactor).toBeGreaterThan(1);
     expect(cfg.boss).toBeTruthy();
@@ -499,5 +502,51 @@ describe('dinosaur roles (2 → 3 → 4 → 5)', () => {
     expect(['bad', 'awful']).toContain(fly.trike);
     expect(TERRAINS.water.suitability.ptero).toBe('bad');
     expect(TERRAINS.grass.suitability.ptero).toBe('ok');
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('level design', () => {
+  it('tells every track in phrases: calm start, varied middle, quick finale', () => {
+    const nominal = DIFFICULTIES.racer.baseSpeed * 1.15;
+    const stats = (style: 'flow' | 'rhythm' | 'endurance' | 'teach') => {
+      const body: number[] = [];
+      const fin: number[] = [];
+      let finales = 0;
+      for (let seed = 1; seed <= 30; seed++) {
+        const t = new TrackGenerator({ seed, worldId: 'jungle', difficulty: 'racer', style }).track;
+        let inFin = false;
+        for (const s of t.segments) {
+          if (s.startArea || s.finish) continue;
+          if (s.finale) {
+            inFin = true;
+            finales++;
+          }
+          (inFin ? fin : body).push((s.end - s.start) / nominal);
+        }
+      }
+      const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
+      return { body: mean(body), fin: mean(fin), n: body.length + fin.length, finales };
+    };
+    const rhythm = stats('rhythm');
+    const endurance = stats('endurance');
+    expect(rhythm.finales).toBe(30);
+    expect(rhythm.body).toBeLessThan(endurance.body - 1.5);
+    expect(rhythm.n).toBeGreaterThan(endurance.n);
+    expect(endurance.fin).toBeLessThan(endurance.body);
+  });
+
+  it('a place focuses on its main terrain', () => {
+    const l = LEVEL_BY_ID['jungle-3'];
+    expect(l.style).toBe('teach');
+    expect(l.focus).toBe('stones');
+    let focus = 0;
+    let other = 0;
+    for (let seed = 1; seed <= 20; seed++) {
+      const t = new TrackGenerator({ seed, worldId: 'jungle', difficulty: 'racer', terrainPool: l.terrainPool, roles: ['raptor', 'spino', 'ankylo'], focus: 'stones', style: 'teach' }).track;
+      focus += t.segments.filter((s) => s.terrain === 'stones').length;
+      other += t.segments.filter((s) => s.terrain === 'woodBarrier').length;
+    }
+    expect(focus).toBeGreaterThan(other * 1.5);
   });
 });
