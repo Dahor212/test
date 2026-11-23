@@ -244,6 +244,20 @@ export class WorldScenery {
     }
     const mtn = m.build(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, fog: false }));
     if (mtn) this.bg.add(mtn);
+    // soft clouds
+    const cl = new GeoMerger();
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2 + hash01(i * 5) * 0.4;
+      const r = 150 + hash01(i * 11) * 110;
+      const x = Math.sin(a) * r;
+      const z = -Math.cos(a) * r;
+      const y = 55 + hash01(i * 3) * 35;
+      const s = 6 + hash01(i * 9) * 6;
+      const white = w === 'volcano' ? 0x9a8a8a : 0xffffff;
+      for (let k = 0; k < 5; k++) cl.add(GEO.sphere(1), k % 2 ? white : (w === 'volcano' ? 0x7a6a6a : 0xf1f6fb), [x + (k - 2) * s * 0.9, y + Math.sin(k * 1.7) * s * 0.3, z + Math.cos(k) * s * 0.4], [s * (1.1 - Math.abs(k - 2) * 0.18), s * 0.62, s * 0.8]);
+    }
+    const clouds = cl.build(new THREE.MeshLambertMaterial({ vertexColors: true, fog: false, emissive: 0x606060 }));
+    if (clouds) this.bg.add(clouds);
     const g = glow.build(new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }));
     if (g) this.bg.add(g);
   }
@@ -270,7 +284,9 @@ export class WorldScenery {
       step: 2.5,
       color: (d, o) => this.groundColor(d, o, this.field.groundY(d, o)),
     });
-    return new THREE.Mesh(geo, vertexColorMat());
+    const mesh = new THREE.Mesh(geo, vertexColorMat());
+    mesh.receiveShadow = true;
+    return mesh;
   }
 
   private buildChunk(k: number): THREE.Object3D {
@@ -308,7 +324,11 @@ export class WorldScenery {
     }
     const g = new THREE.Group();
     const a = m.build(vertexColorMat());
-    if (a) g.add(a);
+    if (a) {
+      a.castShadow = true;
+      a.receiveShadow = true;
+      g.add(a);
+    }
     const b = glow.build(new THREE.MeshBasicMaterial({ vertexColors: true }));
     if (b) g.add(b);
     return g;

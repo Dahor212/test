@@ -46,8 +46,9 @@ export class RacerVisual {
   private dustTimer = 0;
   private trailTimer = 0;
   readonly color: string;
+  private useBlob = true;
 
-  constructor(p: RaceParticipant, showTag: boolean) {
+  constructor(p: RaceParticipant, showTag: boolean, castShadows = false) {
     this.color = p.color;
     this.rigs = {} as Record<Archetype, DinoRig>;
     for (const a of ARCHETYPES) {
@@ -55,17 +56,19 @@ export class RacerVisual {
       const def = DINO_BY_ID[lo.defId] ?? DINO_BY_ID[STARTER_LINEUP[a]];
       const rig = createDino(a, def.palette, lo.accessory);
       rig.root.visible = a === p.current;
+      if (castShadows) rig.root.traverse((o) => (o.castShadow = true));
       this.rigs[a] = rig;
       this.group.add(rig.root);
     }
     this.current = p.current;
     const col = new THREE.Color(p.color).getHex();
     this.shadow = mesh(GEO.disc(), basicMat(0x000000, { opacity: 0.25, depthWrite: false }), [0, 0.07, 0], [1.2, 1, 2.0]);
-    this.ring = mesh(GEO.ring(), basicMat(col, { opacity: 0.95 }), [0, 0.08, 0], [1.5, 1, 1.5]);
+    this.ring = mesh(GEO.ring(), basicMat(col, { opacity: 0.75 }), [0, 0.08, 0], [1.05, 1, 1.05]);
     this.aura = mesh(GEO.ring(), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }), [0, 0.1, 0], [1.8, 1, 1.8]);
     this.flash = mesh(GEO.smoothSphere(), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }), [0, 1, 0], 1);
     this.flash.visible = false;
     this.group.add(this.shadow, this.ring, this.aura, this.flash);
+    this.useBlob = !castShadows;
     this.tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameTagTexture(p.name, p.color), depthWrite: false, depthTest: false }));
     this.tag.scale.set(2.0, 0.56, 1);
     this.tag.position.y = this.rigs[p.current].height + 0.55;
@@ -136,7 +139,7 @@ export class RacerVisual {
       r.root.position.y = -this.sink;
       animateDino(r, dt, p.speed, a === this.current ? mode : 'run', time);
     }
-    this.shadow.visible = this.sink < 0.25;
+    this.shadow.visible = this.useBlob && this.sink < 0.25;
 
     // ability aura & boosts
     const am = this.aura.material as THREE.MeshBasicMaterial;

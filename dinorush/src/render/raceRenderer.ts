@@ -6,8 +6,8 @@ import type { RaceEvent, RaceParticipant } from '../types';
 import { animateDino, createPtero, createTrex, type DinoRig } from './dinoModels';
 import { Particles } from './particles';
 import { RacerVisual } from './racerVisual';
-import { TerrainField, TrackPath } from './trackPath';
-import { laneX, TrackScene } from './trackScene';
+import { racerHeading, racerLateral, TerrainField, TrackPath } from './trackPath';
+import { TrackScene } from './trackScene';
 import { disposeObject } from './util';
 import { applyWorldLighting, WorldScenery } from './worldBuilder';
 
@@ -46,6 +46,8 @@ export class RaceRenderer {
   private opts: RaceRendererOptions;
   private container: HTMLElement;
   private tmp = new THREE.Vector3();
+  private sun: THREE.DirectionalLight;
+  private shadows: boolean;
 
   constructor(container: HTMLElement, engine: RaceEngine, opts: RaceRendererOptions) {
     this.container = container;
@@ -55,12 +57,31 @@ export class RaceRenderer {
     this.renderer = new THREE.WebGLRenderer({ antialias: high, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, high ? 1.75 : 1));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.shadows = high;
+    if (high) {
+      this.renderer.shadowMap.enabled = true;
+      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    }
     this.renderer.domElement.className = 'race-canvas';
     container.appendChild(this.renderer.domElement);
     this.camera = new THREE.PerspectiveCamera(50, 2, 0.5, 700);
     const s = engine.state;
     const world = WORLDS[s.config.worldId];
-    applyWorldLighting(this.scene, world);
+    const lights = applyWorldLighting(this.scene, world);
+    this.sun = lights.sun;
+    if (this.shadows) {
+      this.sun.castShadow = true;
+      this.sun.shadow.mapSize.set(2048, 2048);
+      const sc = this.sun.shadow.camera;
+      sc.left = -26;
+      sc.right = 26;
+      sc.top = 26;
+      sc.bottom = -26;
+      sc.near = 1;
+      sc.far = 120;
+      this.sun.shadow.bias = -0.0006;
+      this.sun.shadow.normalBias = 0.04;
+    }
     this.path = new TrackPath(s.config.seed);
     this.field = new TerrainField(s.track, s.config.worldId, (s.config.seed % 1000) / 100);
     this.world = new WorldScenery(world, this.path, this.field);
@@ -72,13 +93,14 @@ export class RaceRenderer {
     this.particles.density = opts.reducedMotion ? 0.35 : high ? 1 : 0.6;
     this.scene.add(this.particles.points);
     for (const p of s.participants) {
-      const rv = new RacerVisual(p, true);
+      const rv = new RacerVisual(p, true, this.shadows);
       this.racers.push(rv);
       this.scene.add(rv.group);
     }
     if (s.trex) {
       this.trex = createTrex();
       this.trex.root.scale.setScalar(0.85);
+      this.trex.root.traverse((o) => (o.castShadow = true));
       this.scene.add(this.trex.root);
     }
     if (s.team) {
@@ -144,7 +166,8 @@ export class RaceRenderer {
           break;
         case 'smash':
           if (p && e.segmentIndex !== undefined && e.obstacleIndex !== undefined) {
-            const op = this.track.smash(p.lane, e.segmentIndex, e.obstacleIndex, (e.value ?? 0) > 0);
+            const at = s.track.segments[e.segmentIndex].obstacles[e.obstacleIndex]?.at ?? p.position;
+            const op = this.track.smash(e.segmentIndex, e.obstacleIndex, racerLateral(this.path, p.lane, at), (e.value ?? 0) > 0);
             if (op) {
               this.particles.emit('debris', op.x, 0.8, op.z, { count: 12 });
               this.particles.emit('dust', op.x, 0.5, op.z, { count: 8, scale: 1.6 });
@@ -154,7 +177,8 @@ export class RaceRenderer {
           break;
         case 'climb':
           if (p && e.segmentIndex !== undefined && e.obstacleIndex !== undefined) {
-            const op = this.track.climb(p.lane, e.segmentIndex, e.obstacleIndex);
+            const at = s.track.segments[e.segmentIndex].obstacles[e.obstacleIndex]?.at ?? p.position;
+            const op = this.track.climb(e.segmentIndex, e.obstacleIndex, racerLateral(this.path, p.lane, at));
             if (op) this.particles.emit('dust', op.x, 0.5, op.z, { count: 6 });
           }
           break;
@@ -181,6 +205,7 @@ export class RaceRenderer {
         case 'dynamicEvent': {
           const seg = s.track.segments[e.segmentIndex ?? 0];
           this.world.invalidate(seg.start, seg.end);
+          this.track.invalidate(seg.start - 4, seg.end + 4);
           if (e.eventType === 'quake') this.addShake(0.9);
           if (e.eventType === 'flood') this.rain = 3.5;
           for (const l of [-1, 0, 1]) {
@@ -229,8 +254,8 @@ export class RaceRenderer {
       const rv = this.racers[i];
       // racers right in front of the camera (behind the followed player) would block the view
       rv.group.visible = p.kind === 'human' || p.position > this.anchor - 3;
-      this.path.sample(p.position, laneX(p.lane), rv.group.position);
-      rv.group.rotation.y = -this.path.heading(p.position);
+      this.path.sample(p.position, racerLateral(this.path, p.lane, p.position), rv.group.position);
+      rv.group.rotation.y = -racerHeading(this.path, p.lane, p.position);
       const seg = s.track.segments[p.segmentIndex];
       rv.update(dt, this.time, p, seg.terrain, s.phase, this.particles, this.opts.reducedMotion);
       maxPos = Math.max(maxPos, p.position);
@@ -253,7 +278,7 @@ export class RaceRenderer {
           targetLane = p.lane;
         }
       }
-      this.trexLateral += (laneX(targetLane) - this.trexLateral) * Math.min(1, dt * 1.5);
+      this.trexLateral += (racerLateral(this.path, targetLane, s.trex.position) - this.trexLateral) * Math.min(1, dt * 1.5);
       const tp = Math.max(this.anchor - 35, s.trex.position);
       this.path.sample(tp, this.trexLateral, this.trex.root.position);
       this.trex.root.rotation.y = -this.path.heading(tp);
@@ -273,7 +298,7 @@ export class RaceRenderer {
     const height = (trexMode ? 7.8 : 5.4) + this.spread * 0.2;
     const ahead = 13 + this.spread * 0.55;
     const humans = this.humans();
-    const lat = humans.length ? humans.reduce((a, p) => a + laneX(p.lane), 0) / humans.length : 0;
+    const lat = humans.length ? humans.reduce((a, p) => a + racerLateral(this.path, p.lane, p.position), 0) / humans.length : 0;
     const desiredPos = this.path.sample(this.anchor - back, lat * 0.35, new THREE.Vector3());
     desiredPos.y = height;
     const look = this.path.sample(this.anchor + ahead, lat * 0.25, new THREE.Vector3());
@@ -295,6 +320,13 @@ export class RaceRenderer {
       this.shake = Math.max(0, this.shake - dt * 1.5);
     }
     this.camera.lookAt(this.camLook);
+    if (this.shadows) {
+      // keep the shadow camera centred on the action
+      const c = this.path.sample(this.anchor + 10, 0, this.tmp);
+      this.sun.target.position.set(c.x, 0, c.z);
+      this.sun.position.set(c.x - 18, 40, c.z + 14);
+      this.sun.target.updateMatrixWorld();
+    }
 
     if (this.rain > 0 && !this.opts.reducedMotion) {
       this.rain -= dt;
