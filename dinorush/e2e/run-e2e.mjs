@@ -51,6 +51,14 @@ async function newPage(browser, { timescale = 1, viewport = { width: 1180, heigh
   await page.waitForFunction(() => !!window.__dinorush);
   // skip the first-launch tutorial offer if shown
   await page.evaluate(() => window.__dinorush.store.finishTutorialOffer(true));
+  // most scenarios test the classic four dinosaurs; a brand-new profile starts with two
+  if (classicRoles) {
+    await page.evaluate(() =>
+      window.__dinorush.store.updateProfile((pr) => {
+        for (const r of ['raptor', 'spino', 'ankylo', 'trike']) if (!pr.roles.includes(r)) pr.roles.push(r);
+      }),
+    );
+  }
   return { ctx, page };
 }
 
