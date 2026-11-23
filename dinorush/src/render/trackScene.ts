@@ -283,6 +283,38 @@ export class TrackScene {
     const finArch = this.arch(len, 'CÍL', '#ff4757', 0xff4757);
     this.group.add(fin, finArch);
     this.extras.push(fin, finArch);
+    // the finale is dressed up: strings of colourful pennants over the trail
+    const finale = this.track.segments.find((s) => s.finale)?.start ?? len * 0.8;
+    const m = new GeoMerger();
+    const cols = [0xff4757, 0xffd32a, 0x2ed573, 0x1e90ff, 0xa55eea, 0xff9f43];
+    const p = new THREE.Vector3();
+    for (let d = finale + 6, k = 0; d < len - 4; d += 26, k++) {
+      const h = -this.path.heading(d);
+      const cx = Math.cos(h);
+      const cz = -Math.sin(h);
+      const half = PATH_HALF + 1.1;
+      for (const side of [-1, 1]) {
+        this.path.sample(d, side * half, p);
+        m.add(GEO.cylinder(6), 0x8a5a2b, [p.x, 0, p.z], [0.14, 5.2, 0.14]);
+        m.add(GEO.sphere(0), cols[k % cols.length], [p.x, 5.3, p.z], 0.26);
+      }
+      // rope sagging between the poles, flags hanging from it
+      const n = 13;
+      for (let i = 0; i <= n; i++) {
+        const t = i / n;
+        const o = -half + t * half * 2;
+        const y = 4.9 - Math.sin(t * Math.PI) * 0.9;
+        this.path.sample(d, o, p);
+        if (i < n) m.add(GEO.box(), 0xf5f0e6, [p.x + (cx * half * 2) / n / 2, y, p.z + (cz * half * 2) / n / 2], [(half * 2) / n + 0.05, 0.05, 0.05], [0, h, 0]);
+        if (i > 0 && i < n) m.add(GEO.cone(3), cols[(i + k) % cols.length], [p.x, y - 0.02, p.z], [0.32, 0.62, 0.06], [0, h, Math.PI]);
+      }
+    }
+    const flags = m.build(vertexColorMat());
+    if (flags) {
+      flags.castShadow = true;
+      this.group.add(flags);
+      this.extras.push(flags);
+    }
   }
 
   /** Terrain changed (dynamic event): rebuild the trail there. */

@@ -11,7 +11,9 @@ import { RacerVisual } from './racerVisual';
 import { racerHeading, racerLateral, TerrainField, TrackPath } from './trackPath';
 import { TrackScene } from './trackScene';
 import { nameTagTexture } from './textures';
-import { disposeObject } from './util';
+import { castBigShadows, disposeObject } from './util';
+import { SUN_OFFSET } from './backdrop';
+import { Wildlife } from './wildlife';
 import { applyWorldLighting, WorldScenery } from './worldBuilder';
 
 export interface RaceRendererOptions {
@@ -33,6 +35,9 @@ export class RaceRenderer {
   private track: TrackScene;
   private racers: RacerVisual[] = [];
   private world: WorldScenery;
+  private wildlife: Wildlife;
+  private baseFov = 50;
+  private fovKick = 0;
   readonly particles: Particles;
   private trex: DinoRig | null = null;
   private trexRoar = 0;
@@ -65,6 +70,9 @@ export class RaceRenderer {
     this.renderer = new THREE.WebGLRenderer({ antialias: high, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, high ? 1.75 : 1));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // gentle filmic curve: keeps the bright toy colours but rolls off harsh highlights
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
+    this.renderer.toneMappingExposure = 1.08;
     this.shadows = high;
     if (high) {
       this.renderer.shadowMap.enabled = true;
@@ -93,8 +101,11 @@ export class RaceRenderer {
     }
     this.path = new TrackPath(s.config.seed);
     this.field = new TerrainField(s.track, s.config.worldId, (s.config.seed % 1000) / 100);
-    this.world = new WorldScenery(world, this.path, this.field);
+    const scenery = s.config.look?.scenery ?? world.id;
+    this.world = new WorldScenery(world, scenery, this.path, this.field, opts.quality);
     this.scene.add(this.world.group);
+    this.wildlife = new Wildlife(scenery, this.path, this.field, opts.quality, s.config.seed);
+    this.scene.add(this.wildlife.group);
     const showDino = engine.difficulty.hintLevel !== 'minimal';
     this.track = new TrackScene(s.track, this.path, this.field, s.config.worldId, showDino, s.participants.map((p) => p.lane));
     this.scene.add(this.track.group);
@@ -110,7 +121,7 @@ export class RaceRenderer {
       this.trex = createTrex();
       const boss = s.config.boss;
       this.trex.root.scale.setScalar(boss ? 1.08 : 0.85);
-      this.trex.root.traverse((o) => (o.castShadow = true));
+      castBigShadows(this.trex.root);
       if (boss) {
         // the boss wears its name above the head
         const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameTagTexture(boss, '#c0392b'), depthWrite: false, depthTest: false }));
@@ -160,7 +171,8 @@ export class RaceRenderer {
     const h = Math.max(1, this.container.clientHeight);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
-    this.camera.fov = this.camera.aspect < 1.4 ? 62 : this.camera.aspect < 1.9 ? 54 : 48;
+    this.baseFov = this.camera.aspect < 1.4 ? 62 : this.camera.aspect < 1.9 ? 54 : 48;
+    this.camera.fov = this.baseFov + this.fovKick;
     this.camera.updateProjectionMatrix();
     this.particles.setViewport(h * this.renderer.getPixelRatio(), this.camera.fov);
   }
@@ -376,7 +388,7 @@ export class RaceRenderer {
       // keep the shadow camera centred on the action
       const c = this.path.sample(this.anchor + 10, 0, this.tmp);
       this.sun.target.position.set(c.x, 0, c.z);
-      this.sun.position.set(c.x - 18, 40, c.z + 14);
+      this.sun.position.set(c.x + SUN_OFFSET.x, SUN_OFFSET.y, c.z + SUN_OFFSET.z);
       this.sun.target.updateMatrixWorld();
     }
 
@@ -388,7 +400,19 @@ export class RaceRenderer {
       }
     }
 
+    // a touch wider view when the followed racer is flying along (turbo, abilities)
+    if (!this.opts.reducedMotion) {
+      const base = this.engine.difficulty.baseSpeed;
+      const kick = Math.max(0, Math.min(5, (focusP.speed - base * 1.05) * 0.9));
+      const nk = this.fovKick + (kick - this.fovKick) * Math.min(1, dt * 2.5 || 1);
+      if (Math.abs(nk - this.fovKick) > 0.01) {
+        this.fovKick = nk;
+        this.camera.fov = this.baseFov + nk;
+        this.camera.updateProjectionMatrix();
+      }
+    }
     this.world.update(from, to, this.camera, dt, this.time, this.particles, !this.opts.reducedMotion);
+    this.wildlife.update(this.anchor, dt, this.time);
     this.particles.update(dt);
     this.renderer.render(this.scene, this.camera);
   }
@@ -417,6 +441,7 @@ export class RaceRenderer {
     if (this.trex) disposeObject(this.trex.root);
     if (this.ptero) disposeObject(this.ptero.root);
     this.world.dispose();
+    this.wildlife.dispose();
     this.particles.dispose();
     this.renderer.dispose();
     this.renderer.forceContextLoss();

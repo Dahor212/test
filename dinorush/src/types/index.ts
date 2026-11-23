@@ -452,7 +452,13 @@ export interface RaceConfig {
  */
 export type TrackStyle = 'flow' | 'rhythm' | 'endurance' | 'teach';
 
-export type WorldLook = Partial<Pick<WorldDefinition, 'sky' | 'fog' | 'fogNear' | 'fogFar' | 'ambient' | 'sun' | 'sunIntensity' | 'ground' | 'ground2' | 'weather'>>;
+/** Landscape style of a race: a world, or a map region with its own scenery. */
+export type SceneryId = WorldId | 'swamp' | 'canyon';
+
+export type WorldLook = Partial<Pick<WorldDefinition, 'sky' | 'fog' | 'fogNear' | 'fogFar' | 'ambient' | 'sun' | 'sunIntensity' | 'ground' | 'ground2' | 'weather'>> & {
+  /** Scenery builder (plants, rocks, mountains, animals); defaults to the world's. */
+  scenery?: SceneryId;
+};
 
 export type RaceContext = { kind: 'campaign'; levelId: string } | { kind: 'daily'; key: string };
 

@@ -50,7 +50,7 @@ export const WORLDS: Record<WorldId, WorldDefinition> = {
     terrainPool: { path: 2, grass: 1, snow: 3, ice: 3, water: 2, deepWater: 1, stones: 2, scree: 1 },
     firmTerrain: 'path',
     events: ['snowfall', 'rockslide', 'stoneWall'],
-    sky: { top: 0x74b9ff, bottom: 0xeaf6ff },
+    sky: { top: 0x5aa8f5, bottom: 0xd2e9fc },
     fog: 0xe3f2fd,
     fogNear: 60,
     fogFar: 180,

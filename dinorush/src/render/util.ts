@@ -61,6 +61,10 @@ export const GEO = {
   torus: () => cachedGeo('torus', () => new THREE.TorusGeometry(1, 0.25, 6, 16)),
   ring: () => cachedGeo('ring', () => new THREE.RingGeometry(0.82, 1, 32).rotateX(-Math.PI / 2)),
   disc: () => cachedGeo('disc', () => new THREE.CircleGeometry(1, 24).rotateX(-Math.PI / 2)),
+  /** Half ring (ribs, arches). */
+  arc: () => cachedGeo('arc', () => new THREE.TorusGeometry(1, 0.09, 4, 10, Math.PI)),
+  /** Low-poly grass blade. */
+  blade: () => cachedGeo('blade', () => new THREE.ConeGeometry(1, 1, 3).translate(0, 0.5, 0)),
 };
 
 export function mesh(geo: THREE.BufferGeometry, material: THREE.Material, pos?: [number, number, number], scale?: [number, number, number] | number, rot?: [number, number, number]): THREE.Mesh {
@@ -153,6 +157,22 @@ export function vertexColorMat(emissive = 0): THREE.MeshLambertMaterial {
   return m;
 }
 
+/**
+ * Let only the big parts of a model cast shadows: eyes, claws, teeth and
+ * small spikes do not change the shadow but each would cost a draw call.
+ */
+export function castBigShadows(root: THREE.Object3D, minRadius = 0.3) {
+  root.updateMatrixWorld(true);
+  const s = new THREE.Vector3();
+  root.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
+    m.getWorldScale(s);
+    m.castShadow = (m.geometry.boundingSphere?.radius ?? 0) * Math.max(s.x, s.y, s.z) >= minRadius;
+  });
+}
+
 /** Dispose non-shared geometries/materials/textures of a subtree. */
 export function disposeObject(obj: THREE.Object3D) {
   obj.traverse((o) => {
@@ -186,4 +206,18 @@ export function lerp(a: number, b: number, t: number) {
 export function hash01(n: number): number {
   const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
   return x - Math.floor(x);
+}
+
+/** Smooth 2D value noise in [0, 1]. */
+export function valueNoise(x: number, y: number): number {
+  const xi = Math.floor(x);
+  const yi = Math.floor(y);
+  const xf = x - xi;
+  const yf = y - yi;
+  const h = (i: number, j: number) => hash01(i * 157.31 + j * 311.71 + (i * j) % 97);
+  const u = xf * xf * (3 - 2 * xf);
+  const v = yf * yf * (3 - 2 * yf);
+  const a = h(xi, yi) + (h(xi + 1, yi) - h(xi, yi)) * u;
+  const b = h(xi, yi + 1) + (h(xi + 1, yi + 1) - h(xi, yi + 1)) * u;
+  return a + (b - a) * v;
 }

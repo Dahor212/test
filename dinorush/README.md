@@ -27,10 +27,10 @@ npm run dev          # vývojový server (http://localhost:5173 + adresa v síti
 Další příkazy:
 
 ```bash
-npm test             # 87 unit testů herní logiky (Vitest)
+npm test             # 94 unit testů herní logiky (Vitest)
 npm run build        # typová kontrola + produkční build do dist/
 npm run preview      # spuštění produkčního buildu (http://localhost:4173)
-npm run e2e          # build + 25 end-to-end testů v Chromiu (Playwright)
+npm run e2e          # build + 26 end-to-end testů v Chromiu (Playwright)
 ```
 
 > `npm run e2e` potřebuje nainstalovaný Playwright s Chromiem (`npm i -D playwright && npx playwright install chromium`).
@@ -107,14 +107,16 @@ dinorush/
 │  │  ├─ dinosaurs.ts              # archetypy, schopnosti, registr dinosaurů a variant, doplňky
 │  │  ├─ terrain.ts                # registr terénů (vhodnost dinosaurů) a překážek
 │  │  ├─ worlds.ts                 # 4 světy (pool terénů, události, barvy, mlha, světla)
-│  │  ├─ difficulty.ts             # 3 obtížnosti + profily AI
+│  │  ├─ difficulty.ts             # 3 obtížnosti + 5 profilů AI (Mládě → Šampion)
 │  │  ├─ modes.ts                  # 6 herních režimů + pravidla poháru
-│  │  ├─ campaign.ts               # kariéra: 6 oblastí × 5 míst na mapě, krajina tratí, cíle hvězd, fosilie, úrovně průzkumníka
+│  │  ├─ campaign.ts               # kariéra: 6 oblastí × 5 míst na mapě, krajina tratí, cíle hvězd, fosilie, úrovně průzkumníka,
+│  │  │                            #   milníky odemykání dinosaurů, level design míst (styl tratě, hlavní terén)
 │  │  ├─ economy.ts                # odměny, XP úrovně, ceny vylepšení, sekvence vajíček, dekorace
 │  │  └─ missions.ts               # úkoly (podmínka = funkce nad statistikami)
 │  ├─ core/rng.ts                  # deterministický seedovaný generátor
 │  ├─ game/                        # ČISTÁ HERNÍ LOGIKA (bez Three.js a Reactu, testovatelná v Node)
-│  │  ├─ trackGenerator.ts         # datově řízený generátor tratí (seed, intro, události, mince, endless)
+│  │  ├─ trackGenerator.ts         # datově řízený generátor tratí ve „frázích“ (klid, rytmus, dlouhý úsek, oddech,
+│  │  │                            #   finále), styly tratí, výuka nových terénů, seed, události, mince, endless
 │  │  ├─ physics.ts                # výpočet násobičů (terén, penalizace, RPG, perky)
 │  │  ├─ raceEngine.ts             # simulace s pevným krokem: proměny, perfektní proměna, kombo,
 │  │  │                            #   schopnosti, překážky, události, cíl, výsledky
@@ -129,14 +131,17 @@ dinorush/
 │  │  ├─ creature.ts               # „modelovací dílna“: plynulá těla (loft), kostra, šupinatá kůže, klouby
 │  │  ├─ dinoKit.ts                # společná dílna dinosaurů: kostra, kůže, oči, zuby, svalnaté nohy, ruce
 │  │  ├─ dinoModels.ts             # Velociraptor, Spinosaurus/Baryonyx, Ankylosaurus, Triceratops/Styracosaurus, T-Rex, Ptéro + animace
-│  │  ├─ species.ts                # Gallimimus, Dilophosaurus, Stegosaurus, Pachycephalosaurus, Brachiosaurus
-│  │  ├─ trackPath.ts              # zatáčející stezka (vzdálenost → 3D poloha), údolí, řeky a jezera
+│  │  ├─ species.ts                # Gallimimus, Dilophosaurus, Stegosaurus, Pachycephalosaurus, Brachiosaurus, Pteranodon (Letec)
+│  │  ├─ trackPath.ts              # zatáčející stezka (vzdálenost → 3D poloha), údolí, řeky, jezera a propasti
 │  │  ├─ terrainArt.ts             # ručně „malované“ přírodní textury terénů (bez obrázků) v jednom texture array
 │  │  ├─ trail.ts                  # jedna souvislá stezka: plynulé přechody terénů, měkké okraje, pěna u vody
 │  │  ├─ trackScene.ts             # dekorace terénů, most, brány se značkami, překážky přes celou cestu, mince
-│  │  ├─ worldBuilder.ts           # kopce údolí, vegetace podél zatáček, hory, moře, počasí
+│  │  ├─ worldBuilder.ts           # kopce údolí se skvrnitou půdou, rostliny ve 3 pásech podle krajiny, tráva, moře,
+│  │  │                            #   počasí, osvětlení (slunce, obloha, kontrasvětlo)
+│  │  ├─ backdrop.ts               # obloha se sluncem (shader), mraky, pásma hor v oparu, dominanty krajiny
+│  │  ├─ wildlife.ts               # život v pozadí: stáda brachiosaurů a hejna ptakoještěrů (instancované)
 │  │  ├─ raceRenderer.ts           # scéna, kamera jedoucí za dinosaury, efekty z událostí
-│  │  ├─ racerVisual.ts            # závodník: 4 modely, proměna, aura schopnosti, prach/cákance
+│  │  ├─ racerVisual.ts            # závodník: 5 modelů, proměna, aura schopnosti, prach/cákance, let nad propastí
 │  │  ├─ ghostVisual.ts            # průsvitný duch předchozí nejlepší jízdy
 │  │  ├─ particles.ts              # částice v jednom draw callu
 │  │  ├─ stage.ts / parkRenderer.ts# 3D náhledy v menu/sbírce/vejcích a 3D Dino Park
@@ -151,7 +156,7 @@ dinorush/
 │  └─ styles/                      # app.css (základ, závodní HUD, animace), screens.css (jednotný vzhled
 │                                  #   všech menu obrazovek: nebe s kopci, bílé panely, karty s obrázkem)
 ├─ tests/                          # Vitest – generátor, engine, AI, režimy, ekonomika, ukládání, kampaň, duch, profily
-└─ e2e/run-e2e.mjs                 # Playwright – 25 scénářů včetně multi-touch, offline PWA, dobrodružství a profilů
+└─ e2e/run-e2e.mjs                 # Playwright – 26 scénářů včetně multi-touch, offline PWA, dobrodružství, profilů a odemykání
 ```
 
 **Prohlížeč modelů pro vývoj**: při `npm run dev` otevřete `http://localhost:5173/dev/dinos.html`
@@ -169,20 +174,21 @@ dinorush/
 **Závod a mechaniky**
 - 3D závod **pěti dinosaurů** (1–3 lidští hráči + počítačoví soupeři do počtu pěti) na jedné společné stezce se stejnou tratí pro všechny.
 - Odpočet 3–2–1–START, automatický pohyb, startovní a cílová brána, cílová rovinka, výsledky podle skutečných časů.
-- 4 archetypy s odlišnými modely a animacemi (běh, plavání, brodění, klouzání, šplhání, náraz, oslava) a proměna jedním dotykem s efektem (0,4 s) a cooldownem 0,3 s.
+- 5 archetypů (RYCHLÍK, PLAVEC, BOURÁK, TEREŇÁK a LETEC) s odlišnými modely a animacemi (běh, plavání, brodění, klouzání, šplhání, náraz, let, oslava) a proměna jedním dotykem s efektem (0,4 s) a cooldownem 0,3 s. Letec (Pteranodon) přeletí **propast**, hluboký skalní kaňon přes celé údolí, do kterého ostatní dinosauři musí pomalu slézt a zase vylézt.
 - Výpočet rychlosti: základ (podle obtížnosti) × vhodnost terénu (správný 1,15 / použitelný 0,72 / špatný 0,45 / úplně nevhodný 0,32) × bonusy (perfektní proměna, turbo komba, týmové turbo, schopnost) × RPG (max. +12 %). Plynulé zrychlení i zpomalení, minimální rychlost, takže nikdo nikdy neuvízne. Špatně zvolený dinosaurus je tak zhruba 2,5–3,5× pomalejší než ten správný a soupeři s dobrou volbou rychle utečou. U obtížnosti Malý dinosaurus je penalizace mírnější.
 - Překážky: Ankylosaurus je rozbije (rozpad na kusy, úlomky, otřes kamery), ostatní je pomalu přelezou.
 - Upozornění na blížící se terén: plovoucí značka s ikonou (u snadnější obtížnosti i s dinosaurem), barevná brána, čip „další terén“ s odpočtem, pulzující tlačítko s ručičkou (Malý dinosaurus) a zvukový signál.
 - **Perfektní proměna**: okno 1,0 s před změnou až 0,3 s po ní. Dává boost 1,2× a mince. Kdo se přepne dřív, nezpomalí (při „připravenosti“ platí násobič aspoň 1,0) a úsek se mu počítá jako správný.
 - **Dino kombo** podle úspěšně projetých úseků (aspoň 60 % úseku se správným dinosaurem): každé 3× turbo, každé 5× bonusové mince, chyba kombo přeruší.
-- **Speciální schopnosti** se nabíjejí správným používáním a aktivují samy (SUPER SPRINT, VODNÍ VLNA, NEZASTAVITELNÝ NÁRAZ, NEZASTAVITELNÝ POSTUP). Ukazatel nabití je kroužek na tlačítku.
+- **Speciální schopnosti** se nabíjejí správným používáním a aktivují samy (SUPER SPRINT, VODNÍ VLNA, NEZASTAVITELNÝ NÁRAZ, NEZASTAVITELNÝ POSTUP, VZDUŠNÝ KLUZ). Ukazatel nabití je kroužek na tlačítku.
 - **Dynamické události** (6 typů: padající strom, sesuv balvanů, záplava s deštěm, sněžení, sopečný otřes, kamenná zeď) jsou ohlášené předem, dávají vždy dost času na reakci a mají animaci i oznámení.
-- **AI soupeři** používají stejná pravidla i stejné tlačítkové API. Mají tři profily: Začátečník (~70 % správně), Pokročilý (~85 %), Šampion (~94 %). Mají reakční dobu, chybují, opravují chyby, dělají komba a používají schopnosti. Žádné falešné dohánění.
+- **AI soupeři** používají stejná pravidla i stejné tlačítkové API. Mají pět profilů: Mládě (~50 % správně, jen na výukových místech), Nováček (~60 %), Začátečník (~70 %), Pokročilý (~85 %), Šampion (~94 %). Vybírají jen z dinosaurů, které má hráč odemčené. Mají reakční dobu, chybují, opravují chyby, dělají komba a používají schopnosti. Žádné falešné dohánění.
 - **3 obtížnosti** (upozornění 4 / 2,5 / 1,5 s, tempo, délka a střídání úseků, penalizace, nápovědy, síla AI) a **4 světy** (Pravěká džungle, Sopkové údolí, Ledová říše, Dinosauří ostrovy) s vlastním terénem, scenérií, osvětlením, mlhou a počasím.
 - Generátor tratí se seedem: stejný seed znamená stejnou trať („HRÁT ZNOVU“ ji zopakuje). Začíná snadnými úseky a hlídá minimální délku úseku, takže reakce je vždy fyzicky možná (ověřeno testy pro všechny světy a obtížnosti).
+- **Level design**: dřív se úseky losovaly rovnoměrně (každý 3,4–6,2 s), takže všechny tratě působily stejně a neměly žádný vrchol. Teď se trať skládá z **frází**: klidný úvod, rychlé střídání, dlouhý náročný úsek, oddech a **finále** v poslední pětině (kratší úseky, praporky nad stezkou a nápis „FINÁLE – ještě kousek!“). Každé místo kariéry má **styl tratě**: *plynulý*, *rytmický* (hodně rychlých přepnutí), *vytrvalostní* (dlouhé těžké úseky) nebo *výukový* (klidný, s dlouhým prvním setkáním s novým terénem). Může mít i **hlavní terén**, který se na trati objevuje častěji (např. Ledová rokle = propasti). Výuková místa mají mírnější soupeře. Obtížnost byla zkalibrovaná simulací „dětského“ hráče (75 % správných reakcí, pozdní reakce) na všech 30 místech.
 - **Jedna společná stezka**: všech pět dinosaurů běží po jedné přírodní cestě jako smečka (volně se vlní a v zatáčkách nadbíhají dovnitř). Terény do sebe plynule přecházejí (tráva s vyšlapanou cestičkou, mokrý břeh s pěnou u vody), okraje stezky se nepravidelně ztrácejí v trávě a lemují je trsy trávy, kamínky a kytky. Překážka (kmen, zeď, balvany, ledové bloky) vede přes celou šířku cesty a každý ji prorazí tam, kde běží. Dinosauři i stromy vrhají skutečné stíny, na obloze plují mraky.
 - **Trať vede krajinou**: plynule zatáčející stezka údolím mezi kopci. Řeka protéká napříč celým údolím (rákosí, lekníny, kameny na březích), bahno je bažina, písek duny, led zamrzlé jezero, sníh sněžné pole a most vede přes řeku (v sopkách přes lávu). Kamera jede za posledním lidským hráčem, natáčí se se zatáčkami a při větším rozestupu hráčů se oddálí. Skutečné pořadí ukazuje tabulka vlevo nahoře (ikona aktuálního dinosaura a odstup v metrech) a ukazatel postupu tratí nahoře.
-- **Dinosauři připomínají skutečné druhy**: plynulé tělo s ohýbajícím se krkem a ocasem, mohutná svalnatá stehna zapuštěná do těla, štíhlé běháky s lýtkem a tříprsté nohy s drápy (dvounožci), sloupovité nohy s polštáři a nehty (čtyřnožci), čelisti se zuby, oči se zornicí a šupinatá kůže se vzorem. **19 dinosaurů v 11 druzích**: Velociraptor, Gallimimus a Dilophosaurus (RYCHLÍCI), Spinosaurus a Baryonyx (PLAVCI), Ankylosaurus, Stegosaurus a Pachycephalosaurus (BOURÁCI), Triceratops, Styracosaurus a Brachiosaurus (TEREŇÁCI). Každý nový druh má vlastní model (ploténky a bodce stegosaura, kopule tvrdohlavce, dlouhý krk brachiosaura, bodcovitý límec styracosaura, hřebínky dilophosaura…) a vlastní malý bonus.
+- **Dinosauři připomínají skutečné druhy**: plynulé tělo s ohýbajícím se krkem a ocasem, mohutná svalnatá stehna zapuštěná do těla, štíhlé běháky s lýtkem a tříprsté nohy s drápy (dvounožci), sloupovité nohy s polštáři a nehty (čtyřnožci), čelisti se zuby, oči se zornicí a šupinatá kůže se vzorem. **21 dinosaurů ve 12 druzích**: Velociraptor, Gallimimus a Dilophosaurus (RYCHLÍCI), Spinosaurus a Baryonyx (PLAVCI), Ankylosaurus, Stegosaurus a Pachycephalosaurus (BOURÁCI), Triceratops, Styracosaurus a Brachiosaurus (TEREŇÁCI), Pteranodon (LETEC, dvě barvy). Každý nový druh má vlastní model (ploténky a bodce stegosaura, kopule tvrdohlavce, dlouhý krk brachiosaura, bodcovitý límec styracosaura, hřebínky dilophosaura…) a vlastní malý bonus.
 
 **Režimy (6)**: Klasický závod · Dino pohár (5 závodů ve 4 světech, body 10/7/5/3/1, průběžná tabulka, finále s odměnou, uložená historie, pokračování po restartu) · Útěk před T-Rexem (skutečná vzdálenost T-Rexe, hravé předběhnutí, hvězdičky) · Nekonečná výprava (postupná trať, zrychlování, skóre, ukončení a uložení rekordu) · Zlatá horečka (mince za správné úseky, perfektní proměny, komba a zlaté úseky; vítězí nejvíc mincí) · Týmový závod (společné skóre, týmové turbo, porazit létajícího Ptéra = časový limit).
 
@@ -190,7 +196,17 @@ dinorush/
 
 **Progrese**: mince a XP po každém závodě (rozpis odměn). 10 úrovní dinosaurů. Vylepšení RYCHLOST / PROMĚNA / VÝDRŽ za mince (5 stupňů, podmíněno úrovní, každé má měřitelný vliv). Sbírka s 3D náhledy, 19 dinosaurů (4 základní, 8 barevných variant a 7 nových druhů, všichni kromě základních se sólo perky) a 5 doplňků (čepička, brýle, korunka, šála, kytička), které jsou vidět i ve 3D. Sestavení aktivní čtveřice (vždy pokrývá všechny 4 schopnosti). Vajíčko po každých 3 závodech podle předvídatelné sekvence, s animací třesení, prasklin, rozlomení a odhalení. Dino Park 5×4 ve 3D s nákupem 10 dekorací, umístěním, přesunem, uklizením a dinosaury, kteří se procházejí. 16 automaticky vyhodnocovaných úkolů a rekordy.
 
+**Grafika závodu**
+- **Obloha a horizont**: obloha je shader s opravdovým sluncem, září kolem něj a oparem u obzoru. Na obloze plují měkké malované mraky a za údolím stojí dvě až tři pásma hor, která se ve vzduchu ztrácejí do mlhy. Každá krajina má vlastní hory: zelené kopce a modré štíty v pralese, stolové hory s pruhy v kaňonu, zubaté černé vrcholy u sopky, zasněžené štíty v Ledové době a mořský obzor s ostrůvky.
+- **Dominanty**: obří sopka se žhnoucím kráterem, lávou a kouřem, skalní útes s tekoucím vodopádem v pralese, kamenná brána v kaňonu, ledové věže v Ledové době, kouřící ostrovní sopka na moři a obří suché stromy v mlze bažin.
+- **Vlastní krajina pro každou oblast**: Mlžné bažiny mají cypřiše s visícím mechem, rákosí s orobincem, pařezy a muchomůrky. Písečný kaňon má skalní věže s pruhy, pískovcové balvany, suché keře, cykasy a kostry dinosaurů v písku. Prales má obří stromy s kořenovými náběhy, lianami a patrovou korunou. Sopka má obsidiánové hroty a lávová jezírka, ostrovy banánovníky a palmy. Rostliny jsou ve třech pásech: drobné u stezky, keře a stromy v údolí a velké stromy na svazích.
+- **Půda a tráva**: barva půdy má velké skvrny (světlejší louky, tmavší mech) i jemné odstíny, takže to není jedna plochá barva. Podél stezky rostou trsy trávy.
+- **Život v pozadí**: vedle trati se pomalu prochází stádo brachiosaurů (dva dospělí a mládě, krkem se rozhlížejí a spásají), nad údolím krouží hejno ptakoještěrů a mávají křídly.
+- **Světlo**: nižší slunce s delšími stíny, studené kontrasvětlo zezadu obkreslí dinosaury, jemné filmové mapování tónů (barvy zůstávají pestré) a při turbu se kamera lehce rozšíří.
+- **Výkon**: stáda i hejno se kreslí instancovaně (6 draw callů pro všechna zvířata), stíny vrhají jen velké části dinosaurů (o ~75 draw callů méně) a vzdálené rostliny a tráva stíny nevrhají. Při nízké kvalitě grafiky je rostlin, mraků a zvířat zhruba o polovinu méně.
+
 **Dlouhodobá motivace**
+- **Postupné odemykání dinosaurů**: nový hráč začíná jen se dvěma dinosaury (RYCHLÍK a PLAVEC), takže na začátku je volba jednoduchá. Po místě *Říčka u vodopádu* přibude BOURÁK, po *Králi džungle* TEREŇÁK a po prvním bossovi bažin nebo kaňonu LETEC. Tratě se vždy staví jen z terénů, na které má hráč dinosaura, a ve výsledcích se nový dinosaurus slavnostně představí. Hráči s dřívějším postupem mají klasickou čtveřici hned.
 - **Profily hráčů („Kdo hraje?“)**: až 4 děti na jednom tabletu. Každé má vlastní jméno, avatara (dinosaurus + barva), mince, dinosaury, park, úkoly, hvězdy a duchy. Při spuštění s více profily se hra nejdřív zeptá, kdo hraje. Ve společném závodě si na 2. a 3. místo lze vybrat jiný profil (závodí se svými dinosaury a odměny dostane do svého profilu) nebo hosta.
 - **Dobrodružství = kariéra na mapě**: velký ilustrovaný ostrov se šesti oblastmi: Pravěký prales, Mlžné bažiny, Písečný kaňon, Sopečné údolí, Ledová doba a Dinosauří ostrovy. Má 30 míst spojených cestami, které se za pralesem větví, a hráčův avatar po mapě putuje. **Trať se odvíjí od místa**: každé místo má vlastní směs terénů (bažiny = bahno a voda, kaňon = písek, suť a skály, Ledová doba = sníh a led, Lávové mosty = mosty nad lávou), vlastní oblohu, mlhu a počasí (v bažinách prší, v Ledové době sněží). Karta místa ukazuje, jaké terény na trati čekají. Každé místo má 3 hvězdy za konkrétní cíle a na konci oblasti je boss: obří T-Rex se jménem, nebo pojmenovaný šampion oblasti, kterého je třeba předběhnout.
 - **RPG prvky v dětském stylu**: *úroveň průzkumníka* (Vajíčko → Mládě → Průzkumník → Stopař → Závodník → Šampion → Dino legenda) za zkušenosti z kariéry, s odměnou za každou novou úroveň (mince, vajíčka). Na sedmi místech hráč *potká nového dinosaura*, který se k němu po doběhnutí přidá do sbírky. Za 3 hvězdy na místě *najde fosilii* (24 fosilií: zub T-Rexe, jantar s komárem, amonit…). Za poraženého bosse dostane *odznak oblasti*. Odznaky, kamarády i fosilie má v *batohu*. Dřívější postup v Dobrodružství se zachoval.
@@ -200,12 +216,12 @@ dinorush/
 
 **Vzhled menu**: všechny obrazovky mimo závod sdílejí jeden designový systém: stejné pozadí (nebe, mraky a kopce), bílé zaoblené panely, stejné záhlaví (tlačítko zpět, ikona, nadpis, mince), karty s barevným obrázkem nahoře a textem dole, krokový ukazatel při nastavení závodu a spodní lištu s ikonami v hlavním menu.
 
-**Ostatní**: interaktivní tutoriál na skutečné trati (zpomalení, zvýraznění tlačítka, lze přeskočit). Syntetizované zvuky (~22 efektů) a hudba, startují až po dotyku. Nastavení (hlasitost, hudba, efekty, omezení animací, kvalita grafiky, výchozí obtížnost, znovu tutoriál, smazání postupu s dvojitým potvrzením). Verzované ukládání s migrací, validací a zálohou poškozených dat. Pauza při přechodu na pozadí. Výzva k otočení na šířku. PWA instalace a offline režim. Podpora klávesnice na PC (hráč 1: `1–4` / `A S D F`, hráč 2: `Q W E R`, hráč 3: `U I O P`, pauza `Esc` / mezerník).
+**Ostatní**: interaktivní tutoriál na skutečné trati (zpomalení, zvýraznění tlačítka, lze přeskočit). Syntetizované zvuky (~22 efektů) a hudba, startují až po dotyku. Nastavení (hlasitost, hudba, efekty, omezení animací, kvalita grafiky, výchozí obtížnost, znovu tutoriál, smazání postupu s dvojitým potvrzením). Verzované ukládání s migrací, validací a zálohou poškozených dat. Pauza při přechodu na pozadí. Výzva k otočení na šířku. PWA instalace a offline režim. Podpora klávesnice na PC (hráč 1: `1–5` / `A S D F G`, hráč 2: `Q W E R T`, hráč 3: `U I O P J`, pauza `Esc` / mezerník).
 
 ## 7. Testy
 
-- `npm test`: 87 unit testů. Pokrývají determinismus a validitu tratí pro všechny světy a obtížnosti, násobiče rychlosti, cooldown, perfektní proměnu (i to, že dřívější reakce nezpomalí), kombo, schopnosti, překážky, pořadí v cíli, přesnost a sílu AI, délku závodů 90–150 s, všech 6 režimů, normalizaci v multiplayeru, odměny, vylepšení, vajíčka, park, úkoly, pohár, ukládání (včetně poškozených dat a migrace).
-- `npm run e2e`: 25 scénářů v Chromiu. Odpovídají testům 1–20 ze zadání a navíc testují tutoriál, dobrodružství (hvězdy, odemčení, uložení), ducha, denní výzvu s rodinnou tabulkou a profily (nový hráč, společný závod s odměnami pro oba, výběr hráče po spuštění). Používají skutečné dotyky přes CDP, včetně tří prstů najednou, emulaci iPadu, simulaci přechodu na pozadí a offline režim. Výsledek: `e2e/out/report.md` a screenshoty v `e2e/out/`.
+- `npm test`: 94 unit testů. Pokrývají determinismus a validitu tratí pro všechny světy a obtížnosti, násobiče rychlosti, cooldown, perfektní proměnu (i to, že dřívější reakce nezpomalí), kombo, schopnosti, překážky, pořadí v cíli, přesnost a sílu AI, délku závodů 90–150 s, všech 6 režimů, normalizaci v multiplayeru, odměny, vylepšení, vajíčka, park, úkoly, pohár, ukládání (včetně poškozených dat a migrace), postupné odemykání dinosaurů, fráze a finále tratí, styly míst a sílu AI na místech kariéry.
+- `npm run e2e`: 26 scénářů v Chromiu. Odpovídají testům 1–20 ze zadání a navíc testují tutoriál, dobrodružství (hvězdy, odemčení, uložení), ducha, denní výzvu s rodinnou tabulkou a profily (nový hráč, společný závod s odměnami pro oba, výběr hráče po spuštění) a postupné odemykání dinosaurů s Letcem nad propastí. Používají skutečné dotyky přes CDP, včetně tří prstů najednou, emulaci iPadu, simulaci přechodu na pozadí a offline režim. Výsledek: `e2e/out/report.md` a screenshoty v `e2e/out/`.
 
 Poslední běh: **87/87 unit testů a 25/25 E2E scénářů prošlo.**
 

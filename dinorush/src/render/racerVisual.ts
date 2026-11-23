@@ -5,7 +5,7 @@ import type { Archetype, RaceParticipant, TerrainId } from '../types';
 import { animateDino, createDino, ROLE_MODEL, type DinoAnimMode, type DinoRig } from './dinoModels';
 import type { Particles } from './particles';
 import { nameTagTexture } from './textures';
-import { basicMat, clamp01, disposeObject, easeOutBack, GEO, mesh } from './util';
+import { basicMat, castBigShadows, clamp01, disposeObject, easeOutBack, GEO, mesh } from './util';
 
 /** Visual sink depth (relative to hip height) & animation mode on a terrain. */
 export function terrainPose(arch: Archetype, terrain: TerrainId, hip: number): { mode: DinoAnimMode; sink: number } {
@@ -62,7 +62,7 @@ export class RacerVisual {
       const rig = createDino(def.model ?? ROLE_MODEL[def.archetype], def.palette, lo.accessory);
       rig.root.visible = a === p.current;
       this.base[a] = rig.root.scale.x;
-      if (castShadows) rig.root.traverse((o) => (o.castShadow = true));
+      if (castShadows) castBigShadows(rig.root);
       this.rigs[a] = rig;
       this.group.add(rig.root);
     }
