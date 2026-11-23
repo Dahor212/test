@@ -31,8 +31,8 @@ export function CollectionScreen() {
     if (!stageEl.current) return;
     try {
       const st = new DinoStage(stageEl.current, { quality });
-      st.camera.position.set(0, 2.2, 6.8);
-      st.camera.lookAt(0, 0.9, 0);
+      st.camera.position.set(0, 2.0, 5.6);
+      st.camera.lookAt(0, 1.05, 0);
       st.start();
       stageRef.current = st;
     } catch {
@@ -51,7 +51,7 @@ export function CollectionScreen() {
     const st = stageRef.current;
     if (!st) return;
     st.clearActors();
-    const a = st.addDino(selected, inst?.accessory ?? null, [0, 0, 0], 2.6, 'idle');
+    const a = st.addDino(selected, inst?.accessory ?? null, [0, 0, 0], 2.6, 'idle', 0, 3.6);
     a.spin = 0.5;
     if (!inst) {
       // locked: show a dark silhouette only

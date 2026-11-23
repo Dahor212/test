@@ -357,8 +357,9 @@ function HudTop({ ctrl }: { ctrl: RaceController }) {
 function PopupLayer({ ctrl, popups }: { ctrl: RaceController; popups: Popup[] }) {
   const pos = { x: 0, y: 0, visible: false };
   const byPid = new Map<string, number>();
+  const humans = ctrl.engine.state.participants.filter((p) => p.kind === 'human').length;
   return (
-    <div className="popup-layer">
+    <div className={'popup-layer' + (humans > 1 ? ' multi' : '')}>
       {popups.map((p) => {
         if (p.pid === '*') {
           return (
@@ -370,8 +371,11 @@ function PopupLayer({ ctrl, popups }: { ctrl: RaceController; popups: Popup[] })
         ctrl.renderer.screenPosition(p.pid, pos);
         const n = byPid.get(p.pid) ?? 0;
         byPid.set(p.pid, n + 1);
+        // stagger players vertically so texts of neighbours never overlap
+        const seat = ctrl.engine.participant(p.pid)?.seat ?? 0;
+        const stagger = humans > 1 ? seat * 30 : 0;
         return (
-          <div key={p.id} className={`popup popup-${p.kind}`} style={{ left: pos.x, top: Math.max(40, pos.y - n * 34) }}>
+          <div key={p.id} className={`popup popup-${p.kind}`} style={{ left: pos.x, top: Math.max(40, pos.y - n * 30 - stagger) }}>
             {p.text}
           </div>
         );

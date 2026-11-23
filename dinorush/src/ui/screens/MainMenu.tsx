@@ -24,8 +24,7 @@ export function MainMenu() {
       ARCHETYPES.forEach((a, i) => {
         const id = lineup[a];
         const inst = profile.dinos[id];
-        const act = stage!.addDino(id, inst?.accessory ?? null, [-2.7 + i * 1.8, 0, (i % 2) * 0.5], Math.PI - 0.25 + i * 0.17, 'run', 7 + i);
-        act.rig.root.scale.setScalar(0.85);
+        stage!.addDino(id, inst?.accessory ?? null, [-3.3 + i * 2.2, 0, (i % 2) * 0.6], Math.PI - 0.45 + i * 0.3, 'run', 7 + i, 2.6);
       });
       let t = 0;
       stage.onFrame = (dt) => {

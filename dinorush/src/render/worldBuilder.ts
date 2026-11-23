@@ -1,15 +1,28 @@
 import * as THREE from 'three';
 import type { WorldDefinition, WorldId } from '../types';
 import type { Particles } from './particles';
-import { disposeObject, GeoMerger, GEO, hash01, mat, mesh, vertexColorMat } from './util';
+import { PATH_HALF, TerrainField, TrackPath } from './trackPath';
+import { ribbon } from './trackScene';
+import { disposeObject, GeoMerger, GEO, hash01, mat, vertexColorMat } from './util';
 
 const CHUNK = 30;
+const GROUND_CHUNK = 40;
 
 // ---------------------------------------------------------------------------
 // Scenery primitives (added into a GeoMerger)
 // ---------------------------------------------------------------------------
 
-type Adder = (m: GeoMerger, x: number, z: number, s: number, r: number) => void;
+type Sink = Pick<GeoMerger, 'add'>;
+type Adder = (m: Sink, x: number, z: number, s: number, r: number) => void;
+
+/** Adds everything raised to a base height (ground under a tree). */
+class Raised implements Sink {
+  y = 0;
+  constructor(private m: GeoMerger) {}
+  add(geo: THREE.BufferGeometry, color: number, pos: [number, number, number], scale: [number, number, number] | number = 1, rot: [number, number, number] = [0, 0, 0]) {
+    this.m.add(geo, color, [pos[0], pos[1] + this.y, pos[2]], scale, rot);
+  }
+}
 
 const tropicalTree: Adder = (m, x, z, s, r) => {
   const h = 4.5 * s;
@@ -99,7 +112,7 @@ interface WorldStyle {
   far: [Adder, number][];
   border: number;
   sideStrip?: number;
-  glow?: (m: GeoMerger, x: number, z: number, r: number) => void;
+  glow?: (m: Sink, x: number, z: number, r: number) => void;
 }
 
 const STYLES: Record<WorldId, WorldStyle> = {
@@ -160,45 +173,44 @@ function skyDome(top: number, bottom: number): THREE.Mesh {
   return m;
 }
 
+const COLS = [-150, -110, -82, -62, -48, -38, -30, -24, -19, -15, -12, -9.5, -7.8, -6.8, -4, 0, 4, 6.8, 7.8, 9.5, 12, 15, 19, 24, 30, 38, 48, 62, 82, 110, 150];
+
 /**
- * Builds and streams the environment around the track for one world.
+ * Streams the landscape along the curved track: a valley of rolling hills
+ * (with basins where rivers and lakes cross), vegetation and rocks placed
+ * on the slopes, a far mountain ring, sky and weather.
  */
 export class WorldScenery {
   readonly group = new THREE.Group();
   private world: WorldDefinition;
   private style: WorldStyle;
+  private ground = new Map<number, THREE.Mesh>();
   private chunks = new Map<number, THREE.Object3D>();
-  private follow = new THREE.Group();
   private sky: THREE.Mesh;
   private bg = new THREE.Group();
+  private sea: THREE.Mesh | null = null;
   private smokeTimer = 0;
   private weatherTimer = 0;
   private volcanoTops: THREE.Vector3[] = [];
-  private seaPlanes: THREE.Mesh[] = [];
+  private c1: THREE.Color;
+  private c2: THREE.Color;
 
-  constructor(world: WorldDefinition) {
+  constructor(
+    world: WorldDefinition,
+    private path: TrackPath,
+    private field: TerrainField,
+  ) {
     this.world = world;
     this.style = STYLES[world.id] ?? STYLES.jungle;
     this.sky = skyDome(world.sky.top, world.sky.bottom);
-    this.group.add(this.sky, this.follow, this.bg);
-    // ground + track bed + lane dividers (follow the camera focus)
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(500, 500).rotateX(-Math.PI / 2), mat(world.ground));
-    ground.position.y = -0.08;
-    this.follow.add(ground);
-    if (this.style.sideStrip) {
-      for (const x of [-8.5, 8.5]) this.follow.add(mesh(new THREE.PlaneGeometry(7, 500).rotateX(-Math.PI / 2), mat(this.style.sideStrip), [x, -0.06, 0]));
-    }
+    this.c1 = new THREE.Color(world.ground);
+    this.c2 = new THREE.Color(world.ground2);
+    this.group.add(this.sky, this.bg);
     if (world.id === 'islands') {
-      for (const x of [-60, 60]) {
-        const sea = mesh(new THREE.PlaneGeometry(90, 500).rotateX(-Math.PI / 2), mat(0x1fc8db, { flat: false, emissive: 0x05303a }), [x, -0.04, 0]);
-        this.follow.add(sea);
-        this.seaPlanes.push(sea);
-      }
+      this.sea = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), mat(0x1fc8db, { flat: false, emissive: 0x05303a }));
+      this.sea.position.y = -0.6;
+      this.group.add(this.sea);
     }
-    const bed = mesh(new THREE.PlaneGeometry(10.8, 500).rotateX(-Math.PI / 2), mat(world.ground2), [0, -0.02, 0]);
-    this.follow.add(bed);
-    for (const x of [-1.7, 1.7]) this.follow.add(mesh(GEO.box(), mat(0xffffff), [x, 0.05, 0], [0.12, 0.1, 500]));
-    for (const x of [-5.35, 5.35]) this.follow.add(mesh(GEO.box(), mat(this.style.border), [x, 0.12, 0], [0.35, 0.3, 500]));
     this.buildBackground();
   }
 
@@ -206,58 +218,93 @@ export class WorldScenery {
     const w = this.world.id;
     const m = new GeoMerger();
     const glow = new GeoMerger();
-    for (let i = 0; i < 18; i++) {
-      const r = hash01(i * 7 + w.length);
-      const side = i % 2 ? 1 : -1;
-      const x = side * (60 + r * 90);
-      const z = -40 - (i / 18) * 260;
-      const s = 0.7 + hash01(i * 13) * 0.8;
+    const fog = new THREE.Color(this.world.fog);
+    const tint = (c: number, k = 0.45) => new THREE.Color(c).lerp(fog, k).getHex();
+    for (let i = 0; i < 26; i++) {
+      const a = (i / 26) * Math.PI * 2 + hash01(i * 3) * 0.2;
+      const r = 230 + hash01(i * 7 + w.length) * 90;
+      const x = Math.sin(a) * r;
+      const z = -Math.cos(a) * r;
+      const s = 0.8 + hash01(i * 13) * 0.9;
       if (w === 'jungle') {
-        m.add(GEO.cone(7), 0x2f8a4a, [x, 0, z], [30 * s, 26 * s, 30 * s]);
-        m.add(GEO.cone(7), 0x3fa35a, [x * 0.8, 0, z - 20], [20 * s, 18 * s, 20 * s]);
+        m.add(GEO.cone(7), tint(0x2f8a4a), [x, -2, z], [45 * s, 46 * s, 45 * s]);
       } else if (w === 'volcano') {
-        m.add(GEO.cone(8), 0x3a2a28, [x, 0, z], [30 * s, 38 * s, 30 * s]);
-        if (i % 3 === 0) {
-          glow.add(GEO.cone(8), 0xff5a1a, [x, 33 * s, z], [8 * s, 6 * s, 8 * s]);
-          this.volcanoTops.push(new THREE.Vector3(x, 39 * s, z));
+        m.add(GEO.cone(8), tint(0x3a2a28, 0.35), [x, -2, z], [48 * s, 62 * s, 48 * s]);
+        if (i % 4 === 0) {
+          glow.add(GEO.cone(8), 0xff5a1a, [x, 52 * s, z], [12 * s, 9 * s, 12 * s]);
+          this.volcanoTops.push(new THREE.Vector3(x, 61 * s, z));
         }
       } else if (w === 'ice') {
-        m.add(GEO.cone(5), 0xdcefff, [x, 0, z], [26 * s, 42 * s, 26 * s], [0, r, 0]);
-        m.add(GEO.cone(5), 0xffffff, [x, 26 * s, z], [10 * s, 16 * s, 10 * s], [0, r, 0]);
+        m.add(GEO.cone(5), tint(0xdcefff, 0.3), [x, -2, z], [40 * s, 66 * s, 40 * s], [0, a, 0]);
+        m.add(GEO.cone(5), 0xffffff, [x, 38 * s, z], [16 * s, 26 * s, 16 * s], [0, a, 0]);
       } else {
-        m.add(GEO.sphere(1), 0x6fcf6a, [x * 1.3, -6, z], [26 * s, 14 * s, 22 * s]);
-        m.add(GEO.sphere(1), 0xf6e27f, [x * 1.3, -7.5, z], [30 * s, 8 * s, 26 * s]);
+        m.add(GEO.sphere(1), tint(0x6fcf6a), [x, -8, z], [36 * s, 22 * s, 30 * s]);
+        m.add(GEO.cone(6), tint(0x4caf50), [x, 0, z], [18 * s, 34 * s, 18 * s]);
       }
     }
-    const a = m.build(vertexColorMat());
-    if (a) {
-      a.material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, fog: true });
-      this.bg.add(a);
-    }
-    const g = glow.build(new THREE.MeshBasicMaterial({ vertexColors: true }));
+    const mtn = m.build(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, fog: false }));
+    if (mtn) this.bg.add(mtn);
+    const g = glow.build(new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }));
     if (g) this.bg.add(g);
+  }
+
+  private groundColor(d: number, o: number, y: number): THREE.Color {
+    const n = hash01(Math.round(d / 3) * 17 + Math.round(o / 3) * 3);
+    const c = this.c1.clone().lerp(this.c2, 0.25 + n * 0.35);
+    const w = this.world.id;
+    if (y < -0.15) c.lerp(new THREE.Color(w === 'volcano' ? 0x2a1d18 : 0x6b5a3a), Math.min(1, -y * 1.6));
+    if (y > 2) {
+      const hill = Math.min(1, (y - 2) / 6);
+      if (w === 'ice') c.lerp(new THREE.Color(0xffffff), hill * 0.6);
+      else if (w === 'volcano') c.lerp(new THREE.Color(0x3a2c28), hill * 0.7);
+      else c.lerp(new THREE.Color(w === 'islands' ? 0x5cbf4a : 0x2f8a3a), hill * 0.5);
+    }
+    if (w === 'islands' && y < -0.3 && Math.abs(o) > 30) c.copy(new THREE.Color(0xf6e27f));
+    return c;
+  }
+
+  private buildGround(k: number): THREE.Mesh {
+    const d0 = k * GROUND_CHUNK;
+    const d1 = d0 + GROUND_CHUNK;
+    const geo = ribbon(this.path, d0, d1, () => COLS, (d, o) => this.field.groundY(d, o) - (Math.abs(o) < PATH_HALF + 0.3 ? 0.03 : 0), {
+      step: 2.5,
+      color: (d, o) => this.groundColor(d, o, this.field.groundY(d, o)),
+    });
+    return new THREE.Mesh(geo, vertexColorMat());
   }
 
   private buildChunk(k: number): THREE.Object3D {
     const m = new GeoMerger();
+    const raised = new Raised(m);
     const glow = new GeoMerger();
-    const z0 = -k * CHUNK;
     const seed = k * 31 + this.world.id.length * 1000;
-    for (let i = 0; i < 16; i++) {
+    const p = new THREE.Vector3();
+    for (let i = 0; i < 26; i++) {
       const r1 = hash01(seed + i * 3.1);
       const r2 = hash01(seed + i * 5.7);
       const r3 = hash01(seed + i * 9.3);
       const side = i % 2 ? 1 : -1;
-      const near = i < 8;
-      const x = side * (near ? 6.5 + r1 * 5 : 12 + r1 * 22);
-      const z = z0 - r2 * CHUNK;
-      const s = near ? 0.6 + r3 * 0.6 : 0.8 + r3 * 0.7;
+      const near = i < 12;
+      const d = k * CHUNK + r2 * CHUNK;
+      if (d < -60) continue;
+      const edge = this.field.smoothEdge(d, side);
+      const o = side * (near ? edge + 1.6 + r1 * 7 : edge + 9 + r1 * 55);
+      if (!this.field.isDry(d, o)) continue;
+      this.path.sample(d, o, p);
+      raised.y = this.field.groundY(d, o);
+      if (raised.y < -0.25) continue;
+      const s = near ? 0.6 + r3 * 0.6 : 0.9 + r3 * 0.9;
       const adder = pickAdder(near ? this.style.near : this.style.far, r3);
-      adder(m, x, z, s, r2);
+      adder(raised, p.x, p.z, s, r2);
     }
-    if (this.style.glow && hash01(seed + 99) > 0.4) {
+    if (this.style.glow && hash01(seed + 99) > 0.35) {
       const side = hash01(seed + 7) > 0.5 ? 1 : -1;
-      this.style.glow(glow, side * (9 + hash01(seed + 8) * 8), z0 - hash01(seed + 9) * CHUNK, hash01(seed + 10));
+      const d = k * CHUNK + hash01(seed + 9) * CHUNK;
+      const o = side * (this.field.smoothEdge(d, side) + 6 + hash01(seed + 8) * 14);
+      this.path.sample(d, o, p);
+      const r = new Raised(glow);
+      r.y = this.field.groundY(d, o) + 0.05;
+      this.style.glow(r, p.x, p.z, hash01(seed + 10));
     }
     const g = new THREE.Group();
     const a = m.build(vertexColorMat());
@@ -267,14 +314,51 @@ export class WorldScenery {
     return g;
   }
 
-  /** Stream chunks and move follow-objects. `focusZ` = world z of the camera focus. */
-  update(focusPos: number, camera: THREE.Camera, dt: number, time: number, particles: Particles | null, weather: boolean) {
-    const fz = -focusPos;
-    this.follow.position.z = Math.round(fz / 20) * 20;
+  /** Terrain changed (dynamic event) – rebuild the affected landscape. */
+  invalidate(d0: number, d1: number) {
+    for (const [k, obj] of [...this.ground]) {
+      if (k * GROUND_CHUNK <= d1 + 15 && (k + 1) * GROUND_CHUNK >= d0 - 15) {
+        this.group.remove(obj);
+        disposeObject(obj);
+        this.ground.delete(k);
+      }
+    }
+    for (const [k, obj] of [...this.chunks]) {
+      if (k * CHUNK <= d1 + 15 && (k + 1) * CHUNK >= d0 - 15) {
+        this.group.remove(obj);
+        disposeObject(obj);
+        this.chunks.delete(k);
+      }
+    }
+  }
+
+  /** Stream around [from, to] (race distance). */
+  update(from: number, to: number, camera: THREE.Camera, dt: number, time: number, particles: Particles | null, weather: boolean) {
     this.sky.position.copy(camera.position);
-    this.bg.position.z = fz;
-    const first = Math.floor((focusPos - 40) / CHUNK);
-    const last = Math.floor((focusPos + 220) / CHUNK);
+    this.bg.position.set(camera.position.x, 0, camera.position.z);
+    if (this.sea) {
+      this.sea.position.x = camera.position.x;
+      this.sea.position.z = camera.position.z;
+      this.sea.position.y = -0.6 + Math.sin(time * 1.2) * 0.05;
+    }
+    const gFirst = Math.floor((from - 50) / GROUND_CHUNK);
+    const gLast = Math.floor((to + 40) / GROUND_CHUNK);
+    for (const [k, obj] of this.ground) {
+      if (k < gFirst || k > gLast) {
+        this.group.remove(obj);
+        disposeObject(obj);
+        this.ground.delete(k);
+      }
+    }
+    for (let k = gFirst; k <= gLast; k++) {
+      if (!this.ground.has(k)) {
+        const g = this.buildGround(k);
+        this.ground.set(k, g);
+        this.group.add(g);
+      }
+    }
+    const first = Math.floor((from - 40) / CHUNK);
+    const last = Math.floor((to + 30) / CHUNK);
     for (const [k, obj] of this.chunks) {
       if (k < first || k > last) {
         this.group.remove(obj);
@@ -282,36 +366,41 @@ export class WorldScenery {
         this.chunks.delete(k);
       }
     }
-    for (let k = Math.max(-1, first); k <= last; k++) {
+    for (let k = first; k <= last; k++) {
       if (!this.chunks.has(k)) {
         const c = this.buildChunk(k);
         this.chunks.set(k, c);
         this.group.add(c);
       }
     }
-    for (const s of this.seaPlanes) s.position.y = -0.04 + Math.sin(time * 1.5) * 0.03;
     if (!particles || !weather) return;
-    // weather
+    const cx = camera.position.x;
+    const cz = camera.position.z;
+    const fwd = new THREE.Vector3();
+    camera.getWorldDirection(fwd);
     this.weatherTimer += dt;
     if (this.world.weather === 'snow' && this.weatherTimer > 0.05) {
       this.weatherTimer = 0;
-      particles.emit('snow', (Math.random() - 0.5) * 40, 6, fz - 10 - Math.random() * 50, { count: 2 });
-    } else if (this.world.weather === 'sparkle' && this.weatherTimer > 0.15) {
+      const k = 8 + Math.random() * 40;
+      particles.emit('snow', cx + fwd.x * k + (Math.random() - 0.5) * 36, 6, cz + fwd.z * k + (Math.random() - 0.5) * 36, { count: 2 });
+    } else if (this.world.weather === 'sparkle' && this.weatherTimer > 0.2) {
       this.weatherTimer = 0;
+      const k = 20 + Math.random() * 50;
       const side = Math.random() > 0.5 ? 1 : -1;
-      particles.emit('sparkle', side * (20 + Math.random() * 30), 0.2, fz - 10 - Math.random() * 60, { count: 1, color: 0xffffff });
+      particles.emit('sparkle', cx + fwd.x * k + fwd.z * side * 45, 0.1, cz + fwd.z * k - fwd.x * side * 45, { count: 1, color: 0xffffff });
     }
     this.smokeTimer += dt;
-    if (this.volcanoTops.length && this.smokeTimer > 0.35) {
+    if (this.volcanoTops.length && this.smokeTimer > 0.3) {
       this.smokeTimer = 0;
       const t = this.volcanoTops[Math.floor(Math.random() * this.volcanoTops.length)];
-      particles.emit('smoke', t.x, t.y, fz + t.z, { count: 1, scale: 3 });
+      particles.emit('smoke', cx + t.x * 0.55, t.y * 0.6, cz + t.z * 0.55, { count: 1, scale: 4 });
     }
   }
 
   dispose() {
     disposeObject(this.group);
     this.chunks.clear();
+    this.ground.clear();
   }
 }
 

@@ -123,10 +123,12 @@ dinorush/
 │  │  └─ setup.ts                  # sestavení závodníků a drah z nastavení
 │  ├─ progression/                 # profil, verzované ukládání, odměny, RPG, vajíčka, úkoly, park, pohár
 │  ├─ render/                      # 3D VYKRESLOVÁNÍ (jen čte stav enginu)
-│  │  ├─ dinoModels.ts             # procedurální low-poly dinosauři + animace + doplňky + „bake“
-│  │  ├─ trackRenderer.ts          # dráhy, značky, brány, překážky s rozpadem, mince (instancing)
-│  │  ├─ worldBuilder.ts           # prostředí 4 světů, streamované po kusech, počasí
-│  │  ├─ raceRenderer.ts           # scéna, kamera, komprese rozestupů, efekty z událostí
+│  │  ├─ creature.ts               # „modelovací dílna“: plynulá těla (loft), kostra, šupinatá kůže, klouby
+│  │  ├─ dinoModels.ts             # Velociraptor, Spinosaurus, Ankylosaurus, Triceratops, T-Rex, Ptéro + animace chůze/plavání
+│  │  ├─ trackPath.ts              # zatáčející stezka (vzdálenost → 3D poloha), údolí, řeky a jezera
+│  │  ├─ trackScene.ts             # povrchy terénů do krajiny, most, brány se značkami, překážky, mince
+│  │  ├─ worldBuilder.ts           # kopce údolí, vegetace podél zatáček, hory, moře, počasí
+│  │  ├─ raceRenderer.ts           # scéna, kamera jedoucí za dinosaury, efekty z událostí
 │  │  ├─ racerVisual.ts            # závodník: 4 modely, proměna, aura schopnosti, prach/cákance
 │  │  ├─ particles.ts              # částice v jednom draw callu
 │  │  ├─ stage.ts / parkRenderer.ts# 3D náhledy v menu/sbírce/vejcích a 3D Dino Park
@@ -141,6 +143,9 @@ dinorush/
 ├─ tests/                          # Vitest – generátor, engine, AI, režimy, ekonomika, ukládání
 └─ e2e/run-e2e.mjs                 # Playwright – 21 scénářů včetně multi-touch a offline PWA
 ```
+
+**Prohlížeč modelů pro vývoj**: při `npm run dev` otevřete `http://localhost:5173/dev/dinos.html`
+(parametry např. `?view=side&mode=run`, `?ids=trex,ptero`). Do produkční verze se nedostane.
 
 **Architektonické zásady**
 
@@ -165,7 +170,8 @@ dinorush/
 - **AI soupeři** používají stejná pravidla i stejné tlačítkové API. Mají tři profily: Začátečník (~70 % správně), Pokročilý (~85 %), Šampion (~94 %). Mají reakční dobu, chybují, opravují chyby, dělají komba a používají schopnosti. Žádné falešné dohánění.
 - **3 obtížnosti** (upozornění 4 / 2,5 / 1,5 s, tempo, délka a střídání úseků, penalizace, nápovědy, síla AI) a **4 světy** (Pravěká džungle, Sopkové údolí, Ledová říše, Dinosauří ostrovy) s vlastním terénem, scenérií, osvětlením, mlhou a počasím.
 - Generátor tratí se seedem: stejný seed znamená stejnou trať („HRÁT ZNOVU“ ji zopakuje). Začíná snadnými úseky a hlídá minimální délku úseku, takže reakce je vždy fyzicky možná (ověřeno testy pro všechny světy a obtížnosti).
-- Kamera sleduje lidské hráče. Při velkém rozestupu vizuálně zhustí vzdálenosti (pořadí se zachová) a skutečný odstup ukazuje HUD.
+- **Trať vede krajinou**: plynule zatáčející stezka údolím mezi kopci. Řeka protéká napříč celým údolím (rákosí, lekníny, kameny na březích), bahno je bažina, písek duny, led zamrzlé jezero, sníh sněžné pole a most vede přes řeku (v sopkách přes lávu). Kamera jede za posledním lidským hráčem, natáčí se se zatáčkami a při větším rozestupu hráčů se oddálí. Skutečné pořadí a odstupy ukazuje HUD.
+- **Dinosauři připomínají skutečné druhy**: plynulé tělo s ohýbajícím se krkem a ocasem, svalnaté nohy s klouby, prsty a drápy, čelisti se zuby, oči se zornicí a šupinatá kůže se vzorem. Velociraptor má srpovitý dráp a pírka na rukou, Spinosaurus krokodýlí čenich, plachtu s ostny a veslovitý ocas, Ankylosaurus pancíř z kostěných destiček, boční ostny a palici, Triceratops velkou hlavu se zobákem, tři rohy a límec s ozdobným lemem.
 
 **Režimy (6)**: Klasický závod · Dino pohár (5 závodů ve 4 světech, body 10/6/4, průběžná tabulka, finále s odměnou, uložená historie, pokračování po restartu) · Útěk před T-Rexem (skutečná vzdálenost T-Rexe, hravé předběhnutí, hvězdičky) · Nekonečná výprava (postupná trať, zrychlování, skóre, ukončení a uložení rekordu) · Zlatá horečka (mince za správné úseky, perfektní proměny, komba a zlaté úseky; vítězí nejvíc mincí) · Týmový závod (společné skóre, týmové turbo, porazit létajícího Ptéra = časový limit).
 
@@ -184,11 +190,11 @@ Poslední běh: **68/68 unit testů a 21/21 E2E scénářů prošlo.**
 
 ## 8. Omezení první verze
 
-- **Výkon na skutečném tabletu nebyl změřen.** Vývoj probíhal v kontejneru bez GPU (softwarové vykreslování ~12 FPS). Scéna je optimalizovaná na ~170–230 draw callů a ~40 tisíc trojúhelníků na snímek, s omezeným pixel ratio a bez stínů a postprocessingu. Na běžném tabletu by to mělo stačit na plynulý chod, ale ověřit to je potřeba na zařízení. V Nastavení lze vypnout „Vysokou kvalitu grafiky“.
+- **Výkon na skutečném tabletu nebyl změřen.** Vývoj probíhal v kontejneru bez GPU (softwarové vykreslování ~6–12 FPS). Scéna má ~180–250 draw callů a ~90 tisíc trojúhelníků na snímek (nová krajina a detailnější dinosauři), s omezeným pixel ratio a bez stínů a postprocessingu. Na běžném tabletu by to mělo stačit na plynulý chod, ale ověřit to je potřeba na zařízení. V Nastavení lze vypnout „Vysokou kvalitu grafiky“.
 - **Zvuky a hudba nebyly v testech poslechově ověřeny** (headless prohlížeč). Jsou syntetizované a záměrně tiché.
 - Testy proběhly v Chromiu (desktop + emulace iPadu). Safari na iPadu a Chrome na Androidu je potřeba vyzkoušet ručně. Ověřit hlavně multi-touch, zvuk po prvním dotyku a instalaci na plochu.
-- Modely jsou procedurální z primitiv (záměrně, bez externích souborů). Animace jsou jednoduché procedurální.
-- Na úzkých dráhách se při velkém rozestupu dráhy vůči sobě vizuálně posunou (komprese vzdáleností). Skutečné pořadí a odstup ukazuje HUD.
+- Modely se generují kódem (záměrně, bez externích souborů). Animace jsou procedurální, chodidla při běhu trochu kloužou.
+- Kamera sleduje posledního lidského hráče. Počítačový soupeř, který běží těsně za ním, se skryje, aby nezakrýval výhled (v pořadí je dál vidět). Když se hráči hodně rozdělí, ten vepředu je v obraze menší.
 - Dynamické události mění vždy jen jeden úsek. Kombinované víceúsekové události zatím nejsou.
 - Hudba je jedna krátká smyčka pro menu a jedna pro závod.
 - Jeden společný profil pro celý tablet. Mince z multiplayeru se sčítají do jedné peněženky.

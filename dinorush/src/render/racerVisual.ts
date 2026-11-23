@@ -7,20 +7,21 @@ import type { Particles } from './particles';
 import { nameTagTexture } from './textures';
 import { basicMat, clamp01, disposeObject, easeOutBack, GEO, mesh } from './util';
 
-/** Visual sink depth & animation mode for a dino on a terrain. */
-export function terrainPose(arch: Archetype, terrain: TerrainId): { mode: DinoAnimMode; sink: number } {
+/** Visual sink depth (relative to hip height) & animation mode on a terrain. */
+export function terrainPose(arch: Archetype, terrain: TerrainId, hip: number): { mode: DinoAnimMode; sink: number } {
   const t = TERRAINS[terrain];
   const best = t.best === arch;
+  if (terrain === 'bridge') return { mode: 'run', sink: -0.62 };
   switch (t.category) {
     case 'water': {
       const deep = terrain === 'deepWater';
-      if (arch === 'spino') return { mode: 'swim', sink: deep ? 0.95 : 0.75 };
-      return { mode: 'wade', sink: deep ? 0.75 : 0.45 };
+      if (arch === 'spino') return { mode: 'swim', sink: hip * (deep ? 0.95 : 0.82) };
+      return { mode: 'wade', sink: hip * (deep ? 0.55 : 0.38) };
     }
     case 'rough':
       if (terrain === 'ice') return { mode: best ? 'run' : arch === 'raptor' ? 'slip' : 'mud', sink: 0 };
-      if (best) return { mode: 'run', sink: terrain === 'mud' ? 0.12 : 0.06 };
-      return { mode: 'mud', sink: terrain === 'mud' ? 0.3 : 0.18 };
+      if (best) return { mode: 'run', sink: hip * (terrain === 'mud' ? 0.08 : 0.04) };
+      return { mode: 'mud', sink: hip * (terrain === 'mud' ? 0.22 : 0.14) };
     default:
       return { mode: 'run', sink: 0 };
   }
@@ -44,9 +45,6 @@ export class RacerVisual {
   private sink = 0;
   private dustTimer = 0;
   private trailTimer = 0;
-  climbT = 0;
-  smashT = 0;
-  celebrate = false;
   readonly color: string;
 
   constructor(p: RaceParticipant, showTag: boolean) {
@@ -62,15 +60,15 @@ export class RacerVisual {
     }
     this.current = p.current;
     const col = new THREE.Color(p.color).getHex();
-    this.shadow = mesh(GEO.disc(), basicMat(0x000000, { opacity: 0.22, depthWrite: false }), [0, 0.06, 0], [1.1, 1, 1.4]);
-    this.ring = mesh(GEO.ring(), basicMat(col, { opacity: 0.95 }), [0, 0.07, 0], [1.35, 1, 1.35]);
-    this.aura = mesh(GEO.ring(), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }), [0, 0.09, 0], [1.6, 1, 1.6]);
+    this.shadow = mesh(GEO.disc(), basicMat(0x000000, { opacity: 0.25, depthWrite: false }), [0, 0.07, 0], [1.2, 1, 2.0]);
+    this.ring = mesh(GEO.ring(), basicMat(col, { opacity: 0.95 }), [0, 0.08, 0], [1.5, 1, 1.5]);
+    this.aura = mesh(GEO.ring(), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }), [0, 0.1, 0], [1.8, 1, 1.8]);
     this.flash = mesh(GEO.smoothSphere(), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }), [0, 1, 0], 1);
     this.flash.visible = false;
     this.group.add(this.shadow, this.ring, this.aura, this.flash);
     this.tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameTagTexture(p.name, p.color), depthWrite: false, depthTest: false }));
-    this.tag.scale.set(1.9, 0.53, 1);
-    this.tag.position.y = 2.55;
+    this.tag.scale.set(2.0, 0.56, 1);
+    this.tag.position.y = this.rigs[p.current].height + 0.55;
     this.tag.visible = showTag;
     this.tag.renderOrder = 20;
     this.group.add(this.tag);
@@ -121,7 +119,7 @@ export class RacerVisual {
     }
 
     const rig = this.rigs[this.current];
-    let { mode, sink } = terrainPose(this.current, terrain);
+    let { mode, sink } = terrainPose(this.current, terrain, rig.hipHeight);
     if (phase === 'countdown') mode = 'idle';
     if (p.bump > 0) {
       if (p.bumpKind === 'climb') mode = 'climb';
@@ -129,13 +127,16 @@ export class RacerVisual {
     }
     if (p.finished && p.speed < 4) mode = 'celebrate';
     this.sink += (sink - this.sink) * Math.min(1, dt * 6);
+    const tagY = rig.height + 0.55 - Math.max(0, this.sink) * 0.6 + Math.max(0, -this.sink);
+    this.tag.position.y += (tagY - this.tag.position.y) * Math.min(1, dt * 8);
+    this.ring.position.y = this.shadow.position.y = 0.08 + Math.max(0, -this.sink);
     for (const a of ARCHETYPES) {
       const r = this.rigs[a];
       if (!r.root.visible) continue;
       r.root.position.y = -this.sink;
       animateDino(r, dt, p.speed, a === this.current ? mode : 'run', time);
     }
-    this.shadow.visible = this.sink < 0.3;
+    this.shadow.visible = this.sink < 0.25;
 
     // ability aura & boosts
     const am = this.aura.material as THREE.MeshBasicMaterial;

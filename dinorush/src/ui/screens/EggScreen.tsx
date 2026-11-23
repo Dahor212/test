@@ -69,11 +69,11 @@ export function EggScreen() {
       stage.camera.position.set(0, 2.6, 8.2);
       stage.camera.lookAt(0, 1.0, 0);
       if (reward.kind === 'dino' && reward.id) {
-        const a = stage.addDino(reward.id, null, [0, 0, 0], 2.7, 'celebrate');
+        const a = stage.addDino(reward.id, null, [0, 0, 0], 2.7, 'celebrate', 0, 3.8);
         a.spin = 0.4;
       } else if (reward.kind === 'accessory' && reward.id) {
         const id = profile.players[0].lineup.raptor;
-        const a = stage.addDino(id, reward.id, [0, 0, 0], 2.7, 'celebrate');
+        const a = stage.addDino(id, reward.id, [0, 0, 0], 2.7, 'celebrate', 0, 3.8);
         a.spin = 0.4;
       }
       stage.start();

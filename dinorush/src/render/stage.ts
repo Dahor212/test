@@ -54,10 +54,12 @@ export class DinoStage {
     this.resize();
   }
 
-  addDino(defId: string, accessory: string | null, pos: [number, number, number], rotY: number, mode: DinoAnimMode = 'idle', speed = 0): StageActor {
+  addDino(defId: string, accessory: string | null, pos: [number, number, number], rotY: number, mode: DinoAnimMode = 'idle', speed = 0, fit = 0): StageActor {
     const rig = createDinoFromDef(defId, accessory);
     rig.root.position.set(...pos);
     rig.root.rotation.y = rotY;
+    // optionally scale so that the longest dimension fits `fit` metres
+    if (fit > 0) rig.root.scale.setScalar(Math.min(1, fit / Math.max(rig.length, rig.height * 1.2)));
     this.scene.add(rig.root);
     const a: StageActor = { rig, mode, speed };
     this.actors.push(a);
@@ -160,9 +162,9 @@ export function dinoSnapshot(defId: string, accessory: string | null, size = 256
     animateDino(rig, 0.016, 0, 'idle', 0.5);
     rig.root.rotation.y = -2.35;
     snapScene!.add(rig.root);
-    const h = rig.height;
-    snapCam!.position.set(0, h * 0.75, h * 2.6 + 1.2);
-    snapCam!.lookAt(0, h * 0.42, 0);
+    const fit = Math.max(rig.height, rig.length * 0.62);
+    snapCam!.position.set(0, fit * 0.62, fit * 2.35 + 0.6);
+    snapCam!.lookAt(0, rig.height * 0.45, 0);
     snapRenderer.render(snapScene!, snapCam!);
     const url = snapRenderer.domElement.toDataURL('image/png');
     snapScene!.remove(rig.root);

@@ -947,6 +947,13 @@ button {
   color: #ff7a6b;
   font-size: 30px;
 }
+.popup-layer.multi .popup {
+  font-size: 20px;
+}
+.popup-layer.multi .popup-perfect,
+.popup-layer.multi .popup-combo {
+  font-size: 24px;
+}
 .popup-center {
   left: 50%;
   top: 45%;

@@ -52,7 +52,7 @@ export function buildDecoration(id: DecorationId): THREE.Group {
     case 'statue': {
       g.add(mesh(GEO.box(), mat(0xdcd6cf), [0, 0.25, 0], [0.9, 0.5, 0.9]));
       const rig = createDino('raptor', { body: 0xffc312, belly: 0xffe066, accent: 0xc08000, detail: 0xfff3b0, effect: 'gold' });
-      rig.root.scale.setScalar(0.55);
+      rig.root.scale.setScalar(0.32);
       rig.root.position.y = 0.5;
       rig.root.rotation.y = 0.6;
       g.add(rig.root);
@@ -186,7 +186,7 @@ export class ParkRenderer {
       .slice(0, 12)
       .map((d, i) => {
         const rig = createDinoFromDef(d.defId, d.accessory);
-        rig.root.scale.setScalar(0.72);
+        rig.root.scale.setScalar(0.38);
         rig.root.position.set(this.cellX(i % (this.cols * this.rows)) + 0.4, 0.06, this.cellZ(i % (this.cols * this.rows)) + 0.4);
         this.scene.add(rig.root);
         return { rig, target: this.randomPoint(), wait: Math.random() * 2 };
@@ -286,7 +286,7 @@ export class ParkRenderer {
       while (dy > Math.PI) dy -= Math.PI * 2;
       while (dy < -Math.PI) dy += Math.PI * 2;
       r.rotation.y += dy * Math.min(1, dt * 5);
-      animateDino(w.rig, dt, speed * 1.8, 'run', this.time);
+      animateDino(w.rig, dt, speed * 2.6, 'run', this.time);
     }
     if (this.highlight.selected !== null) this.marker.scale.setScalar(TILE * 0.5 * (1 + Math.sin(this.time * 6) * 0.06));
     this.particles.update(dt);
