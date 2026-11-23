@@ -5,13 +5,14 @@ import type { PlayerProfile, RaceConfig, RaceSetup } from '../types';
 import type { ParticipantSetup } from './raceEngine';
 
 /**
- * Lane assignment keeps panels and lanes in the same left→right order:
- * 1 human: AI | P1 | AI,  2 humans: P1 | AI | P2,  3 humans: P1 | P2 | P3.
+ * Five racers share the trail. Positions keep panels and racers in the
+ * same left→right order:
+ * 1 human: AI AI P1 AI AI,  2 humans: AI P1 AI P2 AI,  3 humans: P1 AI P2 AI P3.
  */
 export function laneLayout(humans: number): ('h' | 'a')[] {
-  if (humans >= 3) return ['h', 'h', 'h'];
-  if (humans === 2) return ['h', 'a', 'h'];
-  return ['a', 'h', 'a'];
+  if (humans >= 3) return ['h', 'a', 'h', 'a', 'h'];
+  if (humans === 2) return ['a', 'h', 'a', 'h', 'a'];
+  return ['a', 'a', 'h', 'a', 'a'];
 }
 
 export function buildParticipants(setup: RaceSetup, profile: PlayerProfile, seed: number): ParticipantSetup[] {
@@ -26,7 +27,7 @@ export function buildParticipants(setup: RaceSetup, profile: PlayerProfile, seed
   const layout = laneLayout(setup.humans);
   let seat = 0;
   let ai = 0;
-  return layout.map((kind, lane) => {
+  return layout.map((kind) => {
     if (kind === 'h') {
       const s = seat++;
       const player = profile.players[s];
@@ -46,7 +47,7 @@ export function buildParticipants(setup: RaceSetup, profile: PlayerProfile, seed
       color: AI_COLORS[a],
       kind: 'ai',
       seat: -1,
-      aiProfile: diff.aiProfiles[lane],
+      aiProfile: diff.aiProfiles[a % diff.aiProfiles.length],
       loadout: baseLoadout(),
     } satisfies ParticipantSetup;
   });

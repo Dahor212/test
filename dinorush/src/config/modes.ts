@@ -85,7 +85,7 @@ export const MODE_LIST = Object.values(MODES);
 
 export const CUP_CONFIG = {
   races: 5,
-  points: [10, 6, 4],
+  points: [10, 7, 5, 3, 1],
   winnerCoins: 150,
   finishCoins: 80,
   eggs: 1,

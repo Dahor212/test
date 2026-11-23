@@ -12,14 +12,14 @@ export const GAME_CONFIG = {
   maxFrameDelta: 0.1,
 
   countdownSeconds: 3,
-  laneCount: 3,
-  laneSpacing: 3.4,
+  laneCount: 5,
+  laneSpacing: 2.55,
 
   suitabilityMultiplier: {
-    best: 1.12,
-    ok: 0.8,
-    bad: 0.6,
-    awful: 0.45,
+    best: 1.15,
+    ok: 0.72,
+    bad: 0.45,
+    awful: 0.32,
   } as Record<Suitability, number>,
 
   /**
@@ -33,7 +33,7 @@ export const GAME_CONFIG = {
   accelRate: 4.5,
   decelRate: 7,
   /** Speed never drops below this – nobody ever gets stuck. */
-  minSpeed: 2.6,
+  minSpeed: 2.4,
   /** Overall cap on boost stacking relative to base speed. */
   maxSpeedFactor: 1.75,
 
@@ -111,11 +111,11 @@ export const GAME_CONFIG = {
   },
 
   team: {
-    meterMax: 10,
+    meterMax: 15,
     turboMultiplier: 1.2,
     turboDuration: 2.5,
     /** Rival pace relative to base speed. */
-    rivalPaceFactor: 0.98,
+    rivalPaceFactor: 1.06,
   },
 
   endless: {

@@ -49,21 +49,21 @@ describe('physics multipliers', () => {
     const best = terrainMultiplier('water', l.spino, diff).multiplier;
     const bad = terrainMultiplier('water', l.raptor, diff).multiplier;
     const awful = terrainMultiplier('deepWater', l.raptor, diff).multiplier;
-    expect(best).toBeCloseTo(1.12);
-    expect(bad).toBeCloseTo(0.6);
-    expect(awful).toBeCloseTo(0.45);
+    expect(best).toBeCloseTo(1.15);
+    expect(bad).toBeCloseTo(0.45);
+    expect(awful).toBeCloseTo(0.32);
   });
   it('easy difficulty softens penalties', () => {
     const l = baseLoadout();
-    expect(terrainMultiplier('water', l.raptor, DIFFICULTIES.small).multiplier).toBeGreaterThan(0.7);
+    expect(terrainMultiplier('water', l.raptor, DIFFICULTIES.small).multiplier).toBeGreaterThan(0.6);
   });
   it('stats improve speed and reduce penalties, capped', () => {
     const l = baseLoadout();
     const up = { ...l.spino, stats: { speed: 5, transform: 5, stamina: 5 }, level: 10 };
-    expect(terrainMultiplier('water', up, diff).multiplier).toBeGreaterThan(1.12);
-    expect(terrainMultiplier('water', up, diff).multiplier / 1.12 - 1).toBeLessThanOrEqual(C.rpg.maxTotalBonus + 1e-9);
+    expect(terrainMultiplier('water', up, diff).multiplier).toBeGreaterThan(1.15);
+    expect(terrainMultiplier('water', up, diff).multiplier / 1.15 - 1).toBeLessThanOrEqual(C.rpg.maxTotalBonus + 1e-9);
     const upR = { ...l.raptor, stats: { speed: 0, transform: 0, stamina: 5 }, level: 1 };
-    expect(terrainMultiplier('water', upR, diff).multiplier).toBeGreaterThan(0.6);
+    expect(terrainMultiplier('water', upR, diff).multiplier).toBeGreaterThan(0.45);
   });
 });
 

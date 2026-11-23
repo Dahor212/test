@@ -48,7 +48,7 @@ function defaultShouldEnd(e: RaceEngine): boolean {
 }
 
 function placeStars(place: number): number {
-  return place === 1 ? 3 : place === 2 ? 2 : 1;
+  return place === 1 ? 3 : place <= 3 ? 2 : 1;
 }
 
 const base: Omit<ModeRules, 'id'> = {

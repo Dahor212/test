@@ -11,9 +11,9 @@ export const DIFFICULTIES: Record<DifficultyId, GameDifficulty> = {
     segmentTime: [5.5, 8.5],
     minSegmentTime: 4.6,
     changeProbability: 0.8,
-    penaltyScale: 0.6,
+    penaltyScale: 0.65,
     hintLevel: 'strong',
-    aiProfiles: ['beginner', 'beginner', 'beginner'],
+    aiProfiles: ['beginner', 'beginner', 'beginner', 'beginner'],
     dynamicEvents: [1, 1],
     easyIntro: 0.35,
     trexSpeedFactor: 0.86,
@@ -30,10 +30,10 @@ export const DIFFICULTIES: Record<DifficultyId, GameDifficulty> = {
     changeProbability: 0.88,
     penaltyScale: 1,
     hintLevel: 'normal',
-    aiProfiles: ['advanced', 'beginner', 'advanced'],
+    aiProfiles: ['advanced', 'beginner', 'advanced', 'beginner'],
     dynamicEvents: [1, 2],
     easyIntro: 0.25,
-    trexSpeedFactor: 0.97,
+    trexSpeedFactor: 1.02,
   },
   champion: {
     id: 'champion',
@@ -45,9 +45,9 @@ export const DIFFICULTIES: Record<DifficultyId, GameDifficulty> = {
     segmentTime: [2.4, 4.6],
     minSegmentTime: 1.9,
     changeProbability: 0.93,
-    penaltyScale: 1.15,
+    penaltyScale: 1.1,
     hintLevel: 'minimal',
-    aiProfiles: ['champion', 'advanced', 'champion'],
+    aiProfiles: ['champion', 'advanced', 'champion', 'advanced'],
     dynamicEvents: [2, 3],
     easyIntro: 0.15,
     trexSpeedFactor: 1.02,
@@ -85,4 +85,4 @@ export const AI_PROFILES: Record<AIProfileId, AIProfile> = {
 
 export const AI_NAMES = ['Rexík', 'Dina', 'Ptéro', 'Kostík', 'Šupinka', 'Drápek'];
 export const PLAYER_COLORS = ['#ff4757', '#1e90ff', '#ffa502'];
-export const AI_COLORS = ['#7bed9f', '#eccc68', '#a4b0be'];
+export const AI_COLORS = ['#7bed9f', '#c56cf0', '#a4b0be', '#48dbfb'];

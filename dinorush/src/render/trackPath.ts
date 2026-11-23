@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GAME_CONFIG } from '../config/gameConfig';
 import { TERRAINS } from '../config/terrain';
 import type { TerrainId, TrackDefinition, WorldId } from '../types';
 
@@ -67,7 +68,7 @@ export class TrackPath {
 }
 
 /** Half width of the running path. */
-export const PATH_HALF = 6.4;
+export const PATH_HALF = 7.2;
 
 /**
  * Where a racer runs across the shared trail: everybody keeps a loose
@@ -75,8 +76,8 @@ export const PATH_HALF = 6.4;
  * to the inside of curves. Deterministic in d so coins can be placed on it.
  */
 export function racerLateral(path: TrackPath, lane: number, d: number): number {
-  const base = (lane - 1) * 3.4 * 0.85;
-  const weave = 0.38 * Math.sin(d / 17 + lane * 2.1) + 0.18 * Math.sin(d / 43 + lane * 0.7);
+  const base = (lane - (GAME_CONFIG.laneCount - 1) / 2) * GAME_CONFIG.laneSpacing;
+  const weave = 0.24 * Math.sin(d / 17 + lane * 2.1) + 0.12 * Math.sin(d / 43 + lane * 0.7);
   const curv = (path.heading(d + 5) - path.heading(d - 5)) / 10;
   const inside = Math.max(-1.3, Math.min(1.3, curv * 140));
   return base + weave + inside;

@@ -8,7 +8,7 @@ import { TRAIL_CHUNK, TrailBuilder, updateTrailMaterials } from './trail';
 import { disposeObject, easeOutBack, GeoMerger, GEO, hash01, mat, mesh, vertexColorMat } from './util';
 
 export function laneX(lane: number): number {
-  return (lane - 1) * GAME_CONFIG.laneSpacing;
+  return (lane - (GAME_CONFIG.laneCount - 1) / 2) * GAME_CONFIG.laneSpacing;
 }
 
 // ---------------------------------------------------------------------------

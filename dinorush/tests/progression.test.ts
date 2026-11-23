@@ -212,18 +212,22 @@ describe('missions', () => {
 
 describe('setup & cup', () => {
   it('lane layout keeps panels and lanes aligned', () => {
-    expect(laneLayout(1)).toEqual(['a', 'h', 'a']);
-    expect(laneLayout(2)).toEqual(['h', 'a', 'h']);
-    expect(laneLayout(3)).toEqual(['h', 'h', 'h']);
+    expect(laneLayout(1)).toEqual(['a', 'a', 'h', 'a', 'a']);
+    expect(laneLayout(2)).toEqual(['a', 'h', 'a', 'h', 'a']);
+    expect(laneLayout(3)).toEqual(['h', 'a', 'h', 'a', 'h']);
   });
 
   it('TEST 14/15: builds 2 and 3 human races', () => {
     const p = createDefaultProfile();
     const two = buildParticipants({ ...solo, humans: 2, names: ['A', 'B'] }, p, 1);
-    expect(two.map((x) => x.kind)).toEqual(['human', 'ai', 'human']);
-    expect(two[2].name).toBe('B');
+    expect(two.map((x) => x.kind)).toEqual(['ai', 'human', 'ai', 'human', 'ai']);
+    expect(two[3].name).toBe('B');
     const three = buildParticipants({ ...solo, humans: 3, names: ['A', 'B', 'C'] }, p, 1);
-    expect(three.every((x) => x.kind === 'human')).toBe(true);
+    expect(three).toHaveLength(5);
+    expect(three.filter((x) => x.kind === 'human').map((x) => x.name)).toEqual(['A', 'B', 'C']);
+    const one = buildParticipants(solo, p, 1);
+    expect(one.filter((x) => x.kind === 'ai')).toHaveLength(4);
+    expect(new Set(one.map((x) => x.name)).size).toBe(5);
     expect(buildRaceConfig({ ...solo, humans: 2, names: [] }, 1).normalizeStats).toBe(true);
     expect(buildRaceConfig({ ...solo, humans: 2, mode: 'team', names: [] }, 1).normalizeStats).toBe(false);
   });
@@ -239,7 +243,7 @@ describe('setup & cup', () => {
     }
     expect(cup.finished).toBe(true);
     const total = Object.values(cup.points).reduce((a, b) => a + b, 0);
-    expect(total).toBe(5 * (10 + 6 + 4));
+    expect(total).toBe(5 * (10 + 7 + 5 + 3 + 1));
     const st = cupStandings(cup);
     expect(st[0].points).toBeGreaterThanOrEqual(st[1].points);
     profile.activeCup = cup;
@@ -254,7 +258,7 @@ describe('setup & cup', () => {
     for (const mode of ['classic', 'cup', 'trex', 'endless', 'goldRush', 'team'] as const) {
       const profile = createDefaultProfile();
       const { result } = playRace({ ...solo, mode }, profile, 5);
-      expect(result.results).toHaveLength(3);
+      expect(result.results).toHaveLength(5);
       const sum = applyRaceResult(profile, result);
       expect(sum.totalCoins).toBeGreaterThan(0);
       expect(profile.stats.modesPlayed).toContain(mode);

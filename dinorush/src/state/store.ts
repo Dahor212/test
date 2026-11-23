@@ -246,7 +246,7 @@ class Store {
         seat: 0,
         loadout: baseLoadout(),
         start: 'trike',
-        lane: 1,
+        lane: 2,
       },
     ];
     const config: RaceConfig = { ...buildRaceConfig(setup, 1, true), tutorial: true };

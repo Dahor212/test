@@ -162,7 +162,7 @@ async function main() {
       await p1.screenshot({ path: join(OUT, 't01-menu.png') });
       return 'menu, logo a tlačítko HRÁT viditelné';
     });
-    await test(2, 'Závod jednoho hráče proti dvěma AI (přes UI)', async () => {
+    await test(2, 'Závod jednoho hráče proti čtyřem AI (přes UI)', async () => {
       await p1.getByTestId('play').click({ force: true });
       await p1.getByTestId('mode-classic').click({ force: true });
       await p1.getByTestId('players-1').click({ force: true });
@@ -172,7 +172,7 @@ async function main() {
       await p1.getByTestId('start-race').click({ force: true });
       await p1.waitForFunction(() => window.__race && window.__race.engine.state.phase === 'racing', null, { timeout: 20000 });
       const info = await p1.evaluate(() => window.__race.engine.state.participants.map((p) => p.kind));
-      assert(info.filter((k) => k === 'ai').length === 2 && info.filter((k) => k === 'human').length === 1, 'participants ' + info);
+      assert(info.filter((k) => k === 'ai').length === 4 && info.filter((k) => k === 'human').length === 1, 'participants ' + info);
       // wait for 2 s of simulated race time (independent of how fast the test machine renders)
       await p1.waitForFunction(() => window.__race.engine.state.time > 2, null, { timeout: 30000 });
       const pos = await p1.evaluate(() => window.__race.engine.state.participants.map((p) => p.position));
@@ -206,7 +206,7 @@ async function main() {
     await startRace(p2, { mode: 'classic', humans: 2, names: ['Ema', 'Ben'], worldId: 'jungle', difficulty: 'racer' }, waterSeed);
     await test(14, 'Závod dvou lidských hráčů proti AI', async () => {
       const kinds = await p2.evaluate(() => window.__race.engine.state.participants.map((p) => `${p.id}:${p.kind}`));
-      assert(kinds.join(',') === 'p0:human,ai0:ai,p1:human', kinds.join(','));
+      assert(kinds.join(',') === 'ai0:ai,p0:human,ai1:ai,p1:human,ai2:ai', kinds.join(','));
       assert((await p2.getByTestId('panel-0').count()) === 1 && (await p2.getByTestId('panel-1').count()) === 1, 'two panels');
       const norm = await p2.evaluate(() => window.__race.engine.state.config.normalizeStats);
       assert(norm === true, 'stats normalised for fairness');
@@ -396,7 +396,7 @@ async function main() {
       await p3.waitForTimeout(500);
       await touch(p3, 'dino-btn-2-ankylo');
       await p3.waitForTimeout(80);
-      const cur = await p3.evaluate(() => window.__race.engine.state.participants.map((p) => p.current));
+      const cur = await p3.evaluate(() => window.__race.engine.state.participants.filter((p) => p.kind === 'human').map((p) => p.current));
       assert(cur.join(',') === 'raptor,raptor,ankylo', 'only P3 changed: ' + cur);
       await p3.screenshot({ path: join(OUT, 't15-three.png') });
       return '3 panely × 4 tlačítka; dotyk P3 změnil jen P3';
@@ -405,12 +405,12 @@ async function main() {
       await p3.waitForTimeout(450); // let P3's cooldown pass
       await multiTouch(p3, ['dino-btn-0-trike', 'dino-btn-1-spino', 'dino-btn-2-raptor']);
       await p3.waitForTimeout(80);
-      const cur = await p3.evaluate(() => window.__race.engine.state.participants.map((p) => p.current));
+      const cur = await p3.evaluate(() => window.__race.engine.state.participants.filter((p) => p.kind === 'human').map((p) => p.current));
       assert(cur.join(',') === 'trike,spino,raptor', 'simultaneous: ' + cur);
       await p3.waitForTimeout(450);
       await multiTouch(p3, ['dino-btn-0-ankylo', 'dino-btn-2-spino']);
       await p3.waitForTimeout(80);
-      const cur2 = await p3.evaluate(() => window.__race.engine.state.participants.map((p) => p.current));
+      const cur2 = await p3.evaluate(() => window.__race.engine.state.participants.filter((p) => p.kind === 'human').map((p) => p.current));
       assert(cur2.join(',') === 'ankylo,spino,spino', 'second multi-touch: ' + cur2);
       return 'tři prsty najednou → trike / spino / raptor; dva prsty → ankylo / (beze změny) / spino';
     });

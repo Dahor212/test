@@ -218,7 +218,8 @@ export interface GameDifficulty {
   /** 0..1 scaling of penalty (1 = full table penalty). */
   penaltyScale: number;
   hintLevel: 'strong' | 'normal' | 'minimal';
-  aiProfiles: [AIProfileId, AIProfileId, AIProfileId];
+  /** Profiles of the computer racers (in order of appearance). */
+  aiProfiles: AIProfileId[];
   dynamicEvents: [number, number];
   /** Portion of the track that uses only simple terrains. */
   easyIntro: number;

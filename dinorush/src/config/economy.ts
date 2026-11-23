@@ -3,7 +3,7 @@ import type { DecorationId, EggReward, GameModeId, ParkDecoration, StatId } from
 /** Reward tuning – no microtransactions, no loss of earned coins. */
 export const ECONOMY = {
   finishCoins: 100,
-  placeCoins: [60, 40, 20],
+  placeCoins: [60, 45, 30, 20, 10],
   /**
    * Perfect transformations and combo milestones pay out "bonus coins" during
    * the race (see GAME_CONFIG.perfect.coins / GAME_CONFIG.combo.coinBonus);

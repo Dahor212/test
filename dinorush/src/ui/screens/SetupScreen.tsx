@@ -2,6 +2,7 @@ import { ARCHETYPES, ARCHETYPE_INFO, DINOSAURS, DINO_BY_ID } from '../../config/
 import { DIFFICULTY_LIST, PLAYER_COLORS } from '../../config/difficulty';
 import { MODE_LIST, MODES } from '../../config/modes';
 import { WORLD_LIST } from '../../config/worlds';
+import { laneLayout } from '../../game/setup';
 import { store, useApp, type SetupStep } from '../../state/store';
 import type { Archetype, DifficultyId, WorldId } from '../../types';
 import { Button, DinoIcon, DinoThumb, Icon, TopBar } from '../components/common';
@@ -74,32 +75,39 @@ function PlayersStep({ onNext }: { onNext: () => void }) {
   const setup = useApp((s) => s.setup);
   const team = setup.mode === 'team';
   const opts: { n: 1 | 2 | 3; label: string; sub: string }[] = [
-    { n: 1, label: '1 hráč', sub: team ? '+ 2 počítačoví kamarádi' : '+ 2 počítačoví soupeři' },
-    { n: 2, label: '2 hráči', sub: team ? '+ 1 počítačový kamarád' : '+ 1 počítačový soupeř' },
-    { n: 3, label: '3 hráči', sub: 'Všichni na jednom tabletu' },
+    { n: 1, label: '1 hráč', sub: team ? '+ 4 počítačoví kamarádi' : '+ 4 počítačoví soupeři' },
+    { n: 2, label: '2 hráči', sub: team ? '+ 3 počítačoví kamarádi' : '+ 3 počítačoví soupeři' },
+    { n: 3, label: '3 hráči', sub: team ? '+ 2 počítačoví kamarádi' : '+ 2 počítačoví soupeři' },
   ];
   return (
     <div className="players-step">
       <div className="card-grid cols-3">
-        {opts.map((o) => (
-          <button
-            type="button"
-            key={o.n}
-            data-testid={`players-${o.n}`}
-            className={'choice-card players-card' + (setup.humans === o.n ? ' selected' : '')}
-            onClick={() => store.updateSetup({ humans: o.n })}
-          >
-            <div className="player-figures">
-              {[0, 1, 2].map((i) => (
-                <span key={i} className={'fig' + (i < o.n ? ' human' : ' ai')} style={{ background: i < o.n ? PLAYER_COLORS[i] : '#b2bec3' }}>
-                  <Icon name={i < o.n ? 'star' : 'gear'} size={26} />
-                </span>
-              ))}
-            </div>
-            <span className="card-title">{o.label}</span>
-            <span className="card-desc">{o.sub}</span>
-          </button>
-        ))}
+        {opts.map((o) => {
+          let seat = 0;
+          return (
+            <button
+              type="button"
+              key={o.n}
+              data-testid={`players-${o.n}`}
+              className={'choice-card players-card' + (setup.humans === o.n ? ' selected' : '')}
+              onClick={() => store.updateSetup({ humans: o.n })}
+            >
+              <div className="player-figures">
+                {laneLayout(o.n).map((kind, i) => {
+                  const human = kind === 'h';
+                  const color = human ? PLAYER_COLORS[seat++] : '#b2bec3';
+                  return (
+                    <span key={i} className={'fig' + (human ? ' human' : ' ai')} style={{ background: color }}>
+                      <Icon name={human ? 'star' : 'gear'} size={human ? 24 : 16} />
+                    </span>
+                  );
+                })}
+              </div>
+              <span className="card-title">{o.label}</span>
+              <span className="card-desc">{o.sub}</span>
+            </button>
+          );
+        })}
       </div>
       <div className="names-row">
         {Array.from({ length: setup.humans }, (_, i) => (

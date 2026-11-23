@@ -293,23 +293,45 @@ function HudTop({ ctrl }: { ctrl: RaceController }) {
   const leader = order[0];
   const len = s.track.length;
   const endless = s.track.endless;
+  const humans = s.participants.filter((p) => p.kind === 'human');
+  const best = humans.length ? Math.max(...humans.map((p) => p.position)) : leader.position;
+  const fill = endless ? 0 : Math.max(0, Math.min(1, best / len));
+  // humans close together on the progress bar are spread side by side
+  const humanSpread = new Map<string, number>();
+  {
+    const hs = s.participants.filter((p) => p.kind === 'human').sort((a, b) => a.position - b.position);
+    let group: typeof hs = [];
+    const flush = () => {
+      group.forEach((p, i) => humanSpread.set(p.id, (i - (group.length - 1) / 2) * 26));
+      group = [];
+    };
+    for (const p of hs) {
+      if (group.length && (p.position - group[group.length - 1].position) / len > 0.04) flush();
+      group.push(p);
+    }
+    flush();
+  }
   return (
     <div className="hud-top">
       <div className="ranking" data-testid="ranking">
         {order.map((p) => (
-          <div key={p.id} className={'rank-row' + (p.kind === 'human' ? ' human' : '')}>
-            <span className={`rank-badge place-${p.place}`}>{p.place}.</span>
-            <span className="rank-dot" style={{ background: p.color }} />
+          <div key={p.id} className={'rank-row' + (p.kind === 'human' ? ' human' : '') + (p.finished ? ' fin' : '')} style={{ ['--pc' as string]: p.color }}>
+            <span className={`rank-badge place-${p.place}`}>{p.place}</span>
+            <span className="rank-avatar">
+              <DinoIcon archetype={p.current} defId={p.loadout[p.current].defId} size={24} />
+            </span>
             <span className="rank-name">{p.name}</span>
             <span className="rank-extra">
               {mode.ranking === 'coins' ? (
                 <>
-                  <Icon name="coin" size={16} /> {p.coins}
+                  <Icon name="coin" size={15} /> {p.coins}
                 </>
               ) : mode.ranking === 'score' ? (
                 `${p.score}`
               ) : p.finished ? (
-                <Icon name="flag" size={16} />
+                <Icon name="flag" size={15} />
+              ) : p.caught ? (
+                <Icon name="trex" size={16} />
               ) : p === leader || leader.position - p.position < 1 ? (
                 ''
               ) : (
@@ -322,21 +344,41 @@ function HudTop({ ctrl }: { ctrl: RaceController }) {
       <div className="hud-center">
         {endless ? (
           <div className="endless-info">
-            <span>{Math.round(Math.max(...s.participants.filter((p) => p.kind === 'human').map((p) => p.position)))} m</span>
+            <Icon name="infinity" size={26} />
+            <span>{Math.round(best)} m</span>
             <span className="speed-level">
               <Icon name="bolt" size={18} /> ×{s.ramp.toFixed(2)}
             </span>
           </div>
         ) : (
           <div className="track-progress" data-testid="track-progress">
-            <div className="track-line" />
-            {s.trex && <div className="tp-marker trex" style={{ left: `${Math.max(0, Math.min(1, s.trex.position / len)) * 100}%` }}><Icon name="trex" size={22} /></div>}
-            {s.team && <div className="tp-marker ptero" style={{ left: `${Math.max(0, Math.min(1, s.team.rivalPosition / len)) * 100}%` }}><Icon name="star" size={18} /></div>}
-            {s.participants.map((p) => (
-              <div key={p.id} className={'tp-marker' + (p.kind === 'human' ? ' human' : '')} style={{ left: `${Math.min(1, p.position / len) * 100}%`, background: p.color }} />
-            ))}
+            <div className="tp-road">
+              <div className="tp-fill" style={{ width: `${fill * 100}%` }} />
+            </div>
+            <div className="tp-start" />
+            {s.trex && (
+              <div className="tp-marker trex" style={{ left: `${Math.max(0, Math.min(1, s.trex.position / len)) * 100}%` }}>
+                <Icon name="trex" size={20} />
+              </div>
+            )}
+            {s.team && (
+              <div className="tp-marker ptero" style={{ left: `${Math.max(0, Math.min(1, s.team.rivalPosition / len)) * 100}%` }}>
+                <Icon name="star" size={16} />
+              </div>
+            )}
+            {[...s.participants]
+              .sort((a, b) => (a.kind === 'human' ? 1 : 0) - (b.kind === 'human' ? 1 : 0))
+              .map((p) => (
+                <div
+                  key={p.id}
+                  className={'tp-marker' + (p.kind === 'human' ? ' human' : '')}
+                  style={{ left: `${Math.min(1, p.position / len) * 100}%`, ['--pc' as string]: p.color, ['--dx' as string]: `${humanSpread.get(p.id) ?? 0}px` }}
+                >
+                  {p.kind === 'human' && <span>{p.name.slice(0, 1).toUpperCase()}</span>}
+                </div>
+              ))}
             <div className="tp-flag">
-              <Icon name="flag" size={24} />
+              <Icon name="flag" size={22} />
             </div>
           </div>
         )}
@@ -432,52 +474,100 @@ function PlayerPanel({
   const next = nextChange(s.track, p.segmentIndex);
   const speed = Math.max(p.speed, diff.baseSpeed);
   const ttc = next ? (next.start - p.position) / speed : Infinity;
-  const showNext = next && ttc < diff.warningTime * 1.25 && !p.finished;
+  const showNext = !!next && ttc < diff.warningTime * 1.25 && !p.finished;
   const hintTarget = tutorialTarget ?? (diff.hintLevel === 'strong' && showNext ? next!.recommended : null);
   const wrongNow = s.phase === 'racing' && !p.finished && p.current !== seg.recommended && !p.prepared;
   const cooldown = p.sinceSwitch < p.switchCooldown;
   const trexGap = s.trex && !p.caught && !p.finished ? Math.round(p.position - s.trex.position) : null;
+  const total = s.participants.length;
+  // speed meter: relative to a fast correct run
+  const rel = Math.max(0, Math.min(1, p.speed / (diff.baseSpeed * 1.45)));
+  const speedClass = s.phase !== 'racing' ? 'idle' : p.terrainFactor >= 0.95 ? 'fast' : p.terrainFactor >= 0.7 ? 'mid' : 'slow';
+  const comboToNext = 3 - (p.combo % 3);
+  const ring = showNext ? Math.max(0, Math.min(1, ttc / (diff.warningTime * 1.25))) : 0;
+  const showDinoHint = diff.hintLevel !== 'minimal';
+
+  const nextCard = (
+    <div className={'next-card' + (showNext ? ' show' : '') + (wrongNow && !showNext ? ' wrong' : '')} data-testid={`next-${p.seat}`}>
+      {showNext ? (
+        <>
+          <span className="next-ring" style={{ ['--ring' as string]: `${ring * 360}deg` }}>
+            <TerrainIcon icon={TERRAINS[next!.terrain].icon} size={compact ? 32 : 46} />
+          </span>
+          {showDinoHint && (
+            <>
+              <Icon name="back" size={compact ? 14 : 18} className="next-arrow" />
+              <DinoIcon archetype={next!.recommended} size={compact ? 34 : 48} />
+            </>
+          )}
+          {!compact && <span className="ttc">{Math.max(0, ttc).toFixed(1)} s</span>}
+        </>
+      ) : wrongNow ? (
+        <>
+          <TerrainIcon icon={TERRAINS[seg.terrain].icon} size={compact ? 30 : 42} />
+          {showDinoHint && <DinoIcon archetype={seg.recommended} size={compact ? 32 : 46} />}
+          <span className="bang">!</span>
+        </>
+      ) : (
+        <>
+          <TerrainIcon icon={TERRAINS[seg.terrain].icon} size={compact ? 28 : 38} />
+          {s.phase === 'racing' && !p.finished && <Icon name="check" size={compact ? 18 : 24} className="ok-check" />}
+        </>
+      )}
+    </div>
+  );
 
   return (
     <div className={'player-panel' + (compact ? ' compact' : '')} style={{ ['--pc' as string]: p.color }} data-testid={`panel-${p.seat}`}>
       <div className="panel-head">
-        <span className={`place-badge place-${p.place}`}>{p.place}.</span>
-        <span className="panel-name">{p.name}</span>
-        {p.combo >= 2 && (
-          <span className="combo-chip" data-testid={`combo-${p.seat}`}>
-            ×{p.combo}
+        <div className="head-row">
+          <span className={`medal place-${p.place}`}>
+            {p.place}
+            {!compact && <small>/{total}</small>}
           </span>
-        )}
-        {mode.ranking === 'coins' && (
-          <span className="mini-stat">
-            <Icon name="coin" size={18} />
-            {p.coins}
-          </span>
-        )}
-        {mode.ranking === 'score' && <span className="mini-stat">{p.score}</span>}
-        {trexGap !== null && (
-          <span className={'mini-stat trex-gap' + (trexGap < 12 ? ' danger' : '')} data-testid={`trex-gap-${p.seat}`}>
-            <Icon name="trex" size={20} />
-            {trexGap} m
-          </span>
-        )}
-        {p.caught && <span className="mini-stat trex-gap danger"><Icon name="trex" size={20} /></span>}
-        <div className={'next-chip' + (showNext ? ' show' : '') + (wrongNow ? ' wrong' : '')} data-testid={`next-${p.seat}`}>
-          {showNext ? (
-            <>
-              <TerrainIcon icon={TERRAINS[next!.terrain].icon} size={compact ? 34 : 42} />
-              {diff.hintLevel !== 'minimal' && <DinoIcon archetype={next!.recommended} size={compact ? 34 : 42} />}
-              <span className="ttc">{Math.max(0, ttc).toFixed(1)}</span>
-            </>
-          ) : wrongNow ? (
-            <>
-              <TerrainIcon icon={TERRAINS[seg.terrain].icon} size={compact ? 30 : 38} />
-              <span className="bang">!</span>
-            </>
-          ) : (
-            <TerrainIcon icon={TERRAINS[seg.terrain].icon} size={compact ? 30 : 36} />
+          <span className="panel-name">{p.name}</span>
+          {p.combo >= 2 && (
+            <span className="combo-chip" data-testid={`combo-${p.seat}`}>
+              <Icon name="combo" size={compact ? 14 : 16} />×{p.combo}
+            </span>
+          )}
+          {compact && nextCard}
+        </div>
+        <div className={'speed-meter ' + speedClass} title="Rychlost">
+          <Icon name="bolt" size={compact ? 14 : 18} />
+          <div className="speed-bar">
+            <div style={{ width: `${rel * 100}%` }} />
+          </div>
+          {!compact && <span className="speed-num">{Math.round(p.speed * 3.6)} km/h</span>}
+        </div>
+        <div className="head-stats">
+          {!compact && p.combo > 0 && (
+            <span className="combo-pips" title="Do turba">
+              {[0, 1, 2].map((i) => (
+                <i key={i} className={i < 3 - comboToNext ? 'on' : ''} />
+              ))}
+            </span>
+          )}
+          {mode.ranking === 'coins' && (
+            <span className="mini-stat">
+              <Icon name="coin" size={16} />
+              {p.coins}
+            </span>
+          )}
+          {mode.ranking === 'score' && <span className="mini-stat">{p.score}</span>}
+          {trexGap !== null && (
+            <span className={'mini-stat trex-gap' + (trexGap < 12 ? ' danger' : '')} data-testid={`trex-gap-${p.seat}`}>
+              <Icon name="trex" size={18} />
+              {trexGap} m
+            </span>
+          )}
+          {p.caught && (
+            <span className="mini-stat trex-gap danger">
+              <Icon name="trex" size={18} />
+            </span>
           )}
         </div>
+        {!compact && nextCard}
       </div>
       <div className="dino-buttons">
         {ARCHETYPES.map((a, i) => {
@@ -496,6 +586,7 @@ function PlayerPanel({
                 (active ? ' active' : '') +
                 (hintTarget === a && !active ? ' hint' : '') +
                 (abilityOn ? ' ability-on' : '') +
+                (charge >= 100 ? ' charged' : '') +
                 (cooldown && !active ? ' cooling' : '')
               }
               style={{ ['--dc' as string]: info.color, ['--dcd' as string]: info.colorDark, ['--charge' as string]: `${charge * 3.6}deg` }}
@@ -506,8 +597,16 @@ function PlayerPanel({
               onContextMenu={(e) => e.preventDefault()}
               aria-label={info.species}
             >
-              <span className="charge-ring" />
-              <DinoIcon archetype={a} defId={p.loadout[a].defId} size={compact ? 64 : 84} />
+              <span className="btn-shine" />
+              <span className="charge-badge">
+                <Icon name="bolt" size={compact ? 12 : 15} />
+              </span>
+              {active && (
+                <span className="active-check">
+                  <Icon name="check" size={compact ? 12 : 16} />
+                </span>
+              )}
+              <DinoIcon archetype={a} defId={p.loadout[a].defId} size={compact ? 66 : 92} />
               <span className="dino-role">{info.role}</span>
               {!compact && <span className="key-hint">{KEYS[p.seat]?.[i]}</span>}
               {hintTarget === a && !active && <Icon name="hand" size={compact ? 40 : 50} className="hint-hand" />}
