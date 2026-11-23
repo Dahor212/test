@@ -223,7 +223,7 @@ dinorush/
 - `npm test`: 94 unit testů. Pokrývají determinismus a validitu tratí pro všechny světy a obtížnosti, násobiče rychlosti, cooldown, perfektní proměnu (i to, že dřívější reakce nezpomalí), kombo, schopnosti, překážky, pořadí v cíli, přesnost a sílu AI, délku závodů 90–150 s, všech 6 režimů, normalizaci v multiplayeru, odměny, vylepšení, vajíčka, park, úkoly, pohár, ukládání (včetně poškozených dat a migrace), postupné odemykání dinosaurů, fráze a finále tratí, styly míst a sílu AI na místech kariéry.
 - `npm run e2e`: 26 scénářů v Chromiu. Odpovídají testům 1–20 ze zadání a navíc testují tutoriál, dobrodružství (hvězdy, odemčení, uložení), ducha, denní výzvu s rodinnou tabulkou a profily (nový hráč, společný závod s odměnami pro oba, výběr hráče po spuštění) a postupné odemykání dinosaurů s Letcem nad propastí. Používají skutečné dotyky přes CDP, včetně tří prstů najednou, emulaci iPadu, simulaci přechodu na pozadí a offline režim. Výsledek: `e2e/out/report.md` a screenshoty v `e2e/out/`.
 
-Poslední běh: **87/87 unit testů a 25/25 E2E scénářů prošlo.**
+Poslední běh: **94/94 unit testů a 26/26 E2E scénářů prošlo** (T21 v samostatném běhu přes `E2E_ONLY=21`, protože v plném běhu mu vypršel tehdejší 20s limit; čekání je teď delší). Softwarové WebGL v testovacím prohlížeči kreslí jen 2–3 snímky za sekundu, proto mají scénáře, které čekají na odpočet, delší limity. Jednotlivé scénáře lze pustit přes `E2E_ONLY=18,19 node e2e/run-e2e.mjs`.
 
 ## 8. Omezení první verze
 

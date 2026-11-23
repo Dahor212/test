@@ -571,7 +571,8 @@ async function main() {
     await test(21, 'Interaktivní tutoriál (doplňkový test)', async () => {
       const { page, ctx } = await newPage(browser, { timescale: 1 });
       await page.evaluate(() => window.__dinorush.store.startTutorial());
-      await page.waitForFunction(() => window.__race && window.__race.engine.state.phase === 'racing', null, { timeout: 20000 });
+      // software WebGL: the countdown alone takes ~15–20 s of real time here
+      await page.waitForFunction(() => window.__race && window.__race.engine.state.phase === 'racing', null, { timeout: 60000 });
       await page.waitForTimeout(400);
       const slow = await page.evaluate(() => window.__race.engine.state.timeScale);
       const hint = await page.locator('.dino-btn.hint').getAttribute('data-testid');
@@ -580,7 +581,7 @@ async function main() {
       await page.waitForTimeout(300);
       const fast = await page.evaluate(() => window.__race.engine.state.timeScale);
       assert(fast === 1, 'resumes after correct tap');
-      await page.waitForFunction(() => window.__race.engine.state.timeScale < 0.5, null, { timeout: 20000 });
+      await page.waitForFunction(() => window.__race.engine.state.timeScale < 0.5, null, { timeout: 60000 });
       const hint2 = await page.locator('.dino-btn.hint').getAttribute('data-testid');
       assert(hint2 === 'dino-btn-0-spino', 'water → spino hint ' + hint2);
       await page.screenshot({ path: join(OUT, 't21-tutorial.png') });
