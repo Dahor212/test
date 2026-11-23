@@ -1,7 +1,8 @@
 /**
  * DinoRUSH end-to-end tests (Playwright + Chromium).
  * Runs against the production build (`npm run build` first) served by
- * `vite preview`. Covers the 20 acceptance scenarios from the brief.
+ * `vite preview`. Covers the 20 acceptance scenarios from the brief plus
+ * the tutorial and the long-term features (adventure, ghost, daily, profiles).
  *
  *   npm run build && npm run e2e
  */
@@ -566,7 +567,122 @@ async function main() {
       return 'zpomalení + zvýraznění správného tlačítka (Velociraptor, pak Spinosaurus)';
     });
 
-    for (const p of [p1, p2, p3, p4]) if (p.__errors.length) console.log('page errors:', p.__errors);
+    // ------------------------------------------- extra: long-term motivation
+    const { page: p5, ctx: c5 } = await newPage(browser, { timescale: 12 });
+    await test(22, 'Dobrodružství: mapa, úroveň, hvězdy a odemčení další úrovně', async () => {
+      await p5.getByTestId('nav-campaign').click({ force: true });
+      await p5.getByTestId('campaign').waitFor();
+      assert(await p5.getByTestId('level-jungle-2').isDisabled(), 'level 2 locked at start');
+      await p5.getByTestId('level-jungle-1').click({ force: true });
+      await p5.getByTestId('level-card').waitFor();
+      await p5.getByTestId('start-level').click({ force: true });
+      await p5.waitForFunction(() => window.__race && window.__race.engine && window.__race.engine.state.config.context?.levelId === 'jungle-1', null, { timeout: 30000 });
+      await startBot(p5, ['p0']);
+      await waitResults(p5);
+      const stars = Number(await p5.getByTestId('level-stars').getAttribute('data-stars'));
+      assert(stars >= 1, 'stars ' + stars);
+      await p5.screenshot({ path: join(OUT, 't22-level-result.png') });
+      await p5.getByTestId('to-map').click({ force: true });
+      await p5.getByTestId('campaign').waitFor();
+      assert(!(await p5.getByTestId('level-jungle-2').isDisabled()), 'level 2 unlocked');
+      await p5.screenshot({ path: join(OUT, 't22-map.png') });
+      await p5.reload();
+      await p5.waitForFunction(() => !!window.__dinorush);
+      const kept = await p5.evaluate(() => window.__dinorush.store.get().profile.campaign.stars['jungle-1']);
+      assert(kept === stars, 'stars saved ' + kept);
+      return `úroveň 1: ${stars} ★, úroveň 2 odemčena, hvězdy uložené i po obnovení stránky`;
+    });
+    await test(23, 'Duch vlastního rekordu', async () => {
+      await p5.evaluate(() => window.__dinorush.store.finishTutorialOffer(true));
+      const g = await p5.evaluate(() => {
+        const st = window.__dinorush.store.get();
+        return st.profile.ghosts['c:jungle-1:' + st.profile.campaign.difficulty];
+      });
+      assert(g && g.pos.length > 20, 'ghost saved with the first run');
+      await p5.evaluate(() => {
+        window.__race = null;
+        window.__dinorush.store.startCampaignLevel('jungle-1');
+      });
+      await p5.waitForFunction(() => window.__race && window.__race.engine, null, { timeout: 30000 });
+      assert(await p5.evaluate(() => !!window.__race.ghost), 'race starts with the ghost');
+      await startBot(p5, ['p0']);
+      await p5.waitForFunction(() => window.__race.engine.state.time > 4, null, { timeout: 30000 });
+      assert(await p5.getByTestId('ghost-marker').isVisible(), 'ghost marker on the progress bar');
+      assert(await p5.getByTestId('ghost-gap-0').isVisible(), 'distance to the ghost in the panel');
+      const ghostPos = await p5.evaluate(() => window.__race.ghost.positionAt(window.__race.engine.state.time));
+      assert(ghostPos > 10, 'ghost runs ' + ghostPos);
+      await p5.screenshot({ path: join(OUT, 't23-ghost.png') });
+      await waitResults(p5);
+      const out = await p5.evaluate(() => window.__dinorush.store.get().last.ghost);
+      assert(out && out.had, 'result compares with the ghost');
+      assert(await p5.getByTestId('ghost-result').isVisible(), 'ghost line on results');
+      return `duch ${g.time.toFixed(1)} s; výsledek: ${out.beaten ? 'poražen' : 'neporažen'} (rozdíl ${out.delta} s)`;
+    });
+    await test(24, 'Denní výzva a rodinná tabulka', async () => {
+      await p5.getByTestId('to-menu').click({ force: true });
+      const before = await p5.evaluate(() => window.__dinorush.store.get().profile.coins);
+      await p5.getByTestId('nav-daily').click({ force: true });
+      await p5.getByTestId('daily').waitFor();
+      await p5.getByTestId('start-daily').click({ force: true });
+      await p5.waitForFunction(() => window.__race && window.__race.engine && window.__race.engine.state.config.context?.kind === 'daily', null, { timeout: 30000 });
+      const spec = await p5.evaluate(() => ({ world: window.__race.engine.state.config.worldId, mode: window.__race.engine.state.config.mode }));
+      await startBot(p5, ['p0']);
+      await waitResults(p5);
+      assert(await p5.getByTestId('daily-result').isVisible(), 'daily result');
+      const st = await p5.evaluate(() => {
+        const s = window.__dinorush.store.get();
+        return { coins: s.profile.coins, daily: s.profile.daily, lines: s.last.rewards.players[0].lines.map((l) => l.label) };
+      });
+      assert(st.daily.rewarded && st.daily.completed === 1, 'daily done ' + JSON.stringify(st.daily));
+      assert(st.lines.includes('Denní výzva'), 'reward line');
+      await p5.getByTestId('to-daily').click({ force: true });
+      const row = await p5.getByTestId('family-table').textContent();
+      assert(!row.includes('Zatím bez jízdy'), 'family table shows the run: ' + row);
+      await p5.screenshot({ path: join(OUT, 't24-daily.png') });
+      return `${spec.mode} / ${spec.world}; mince ${before} → ${st.coins}; ${st.daily.stars} ★`;
+    });
+    await c5.close();
+
+    await test(25, 'Profily: nový hráč, oddělený postup a společný závod', async () => {
+      const { page, ctx } = await newPage(browser, { timescale: 14 });
+      await page.getByTestId('profile-chip').click({ force: true });
+      await page.getByTestId('profiles').waitFor();
+      await page.getByTestId('new-profile').click({ force: true });
+      await page.getByTestId('profile-name').fill('Ben');
+      await page.getByTestId('avatar-trike').click({ force: true });
+      await page.getByTestId('save-profile').click({ force: true });
+      await page.getByTestId('main-menu').waitFor();
+      const s1 = await page.evaluate(() => {
+        const s = window.__dinorush.store.get();
+        return { name: s.profile.players[0].name, n: s.profiles.length, avatar: s.profile.avatar.archetype };
+      });
+      assert(s1.name === 'Ben' && s1.n === 2 && s1.avatar === 'trike', JSON.stringify(s1));
+      const ids = await page.evaluate(() => window.__dinorush.store.get().profiles.map((p) => p.id));
+      // a shared race: Ben (seat 1) + the first child on seat 2
+      await page.evaluate((ids) => {
+        window.__race = null;
+        window.__dinorush.store.startRace(9, { mode: 'classic', humans: 2, names: ['Ben', 'x'], worldId: 'jungle', difficulty: 'racer', seatProfiles: [ids[1], ids[0]] });
+      }, ids);
+      await page.waitForFunction(() => window.__race && window.__race.engine, null, { timeout: 30000 });
+      const names = await page.evaluate(() => window.__race.engine.state.participants.filter((p) => p.kind === 'human').map((p) => p.name));
+      assert(names.join(',') === 'Ben,Hráč 1', 'seat names ' + names);
+      await startBot(page, ['p0', 'p1']);
+      await waitResults(page);
+      const after = await page.evaluate(() => window.__dinorush.store.get().profiles.map((p) => ({ name: p.players[0].name, races: p.stats.racesFinished, coins: p.coins })));
+      assert(after.every((p) => p.races === 1 && p.coins > 100), 'both children credited ' + JSON.stringify(after));
+      // reload with two profiles → "who is playing?" first
+      await page.reload();
+      await page.getByTestId('profiles').waitFor({ timeout: 15000 });
+      await page.screenshot({ path: join(OUT, 't25-profiles.png') });
+      await page.getByTestId('profile-Hráč 1').click({ force: true });
+      await page.getByTestId('main-menu').waitFor();
+      const active = await page.evaluate(() => window.__dinorush.store.get().profile.players[0].name);
+      assert(active === 'Hráč 1', 'switched ' + active);
+      await ctx.close();
+      return `2 profily; společný závod připsal oběma (${after.map((p) => `${p.name}: ${p.coins}`).join(', ')}); po obnovení výběr hráče`;
+    });
+
+    for (const p of [p1, p2, p3, p4, p5]) if (p.__errors.length) console.log('page errors:', p.__errors);
   } finally {
     await browser.close();
     server.kill();

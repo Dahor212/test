@@ -226,7 +226,7 @@ export interface GameDifficulty {
   trexSpeedFactor: number;
 }
 
-export type AIProfileId = 'beginner' | 'advanced' | 'champion';
+export type AIProfileId = 'rookie' | 'beginner' | 'advanced' | 'champion';
 
 export interface AIProfile {
   id: AIProfileId;
@@ -409,7 +409,15 @@ export interface RaceConfig {
   normalizeStats: boolean;
   tutorial?: boolean;
   trackLengthOverride?: number;
+  /** T-Rex speed relative to the difficulty's normal T-Rex (campaign levels / bosses). */
+  trexFactor?: number;
+  /** Bigger boss T-Rex with its own name. */
+  boss?: string;
+  /** Where the race comes from (campaign level, daily challenge). */
+  context?: RaceContext;
 }
+
+export type RaceContext = { kind: 'campaign'; levelId: string } | { kind: 'daily'; key: string };
 
 export interface RaceState {
   config: RaceConfig;
@@ -490,6 +498,7 @@ export interface LifetimeStats {
   eggsOpened: number;
   abilitiesUsed: number;
   modesPlayed: GameModeId[];
+  ghostsBeaten: number;
 }
 
 export type EggRewardKind = 'dino' | 'accessory' | 'coins';
@@ -568,6 +577,8 @@ export interface CupState {
   colors: Record<string, string>;
   races: CupRaceRecord[];
   finished: boolean;
+  /** Profile ids of seats 2 and 3 (null = guest). */
+  seatProfiles?: (string | null)[];
 }
 
 export interface CupHistoryEntry {
@@ -581,7 +592,78 @@ export interface Inventory {
   accessories: string[];
 }
 
+// ---------------------------------------------------------------------------
+// Long-term motivation: profiles, campaign, daily challenge, ghosts
+// ---------------------------------------------------------------------------
+
+export interface Avatar {
+  archetype: Archetype;
+  color: string;
+}
+
+export type GoalKind = 'place' | 'escape' | 'lead' | 'perfects' | 'combo' | 'smash' | 'mistakes';
+
+/** One star goal; the first goal of a level is the pass condition. */
+export interface StarGoal {
+  kind: GoalKind;
+  value: number;
+}
+
+export type CampaignMode = 'classic' | 'goldRush' | 'trex';
+
+export interface CampaignLevel {
+  id: string;
+  world: WorldId;
+  /** 0-based index within the world. */
+  index: number;
+  /** 1-based number over the whole campaign. */
+  number: number;
+  title: string;
+  mode: CampaignMode;
+  boss: boolean;
+  /** Track length for the 'racer' difficulty (scaled for the others). */
+  length: number;
+  ai: 'easy' | 'normal' | 'hard';
+  trexFactor: number;
+  seed: number;
+  goals: [StarGoal, StarGoal, StarGoal];
+}
+
+export interface CampaignState {
+  difficulty: DifficultyId;
+  /** Best stars per level id (0–3). */
+  stars: Record<string, number>;
+}
+
+export interface DailyState {
+  /** Local date 'YYYY-MM-DD' the fields below belong to. */
+  key: string;
+  /** Best value of the day (mode metric, see daily.ts); null = not finished yet. */
+  best: number | null;
+  stars: number;
+  /** Today's completion reward already paid. */
+  rewarded: boolean;
+  /** Lifetime number of days with a finished daily challenge. */
+  completed: number;
+}
+
+/** Recorded run of a racer: positions every `dt` seconds of race time. */
+export interface GhostData {
+  v: 1;
+  dt: number;
+  /** Positions in decimetres. */
+  pos: number[];
+  /** One letter per sample: r / s / a / t. */
+  arch: string;
+  /** Finish time in seconds. */
+  time: number;
+  name: string;
+  at: number;
+}
+
 export interface PlayerProfile {
+  id: string;
+  avatar: Avatar;
   createdAt: number;
   coins: number;
   totalCoinsEarned: number;
@@ -597,6 +679,9 @@ export interface PlayerProfile {
   cupHistory: CupHistoryEntry[];
   tutorialDone: boolean;
   lastSetup: RaceSetup | null;
+  campaign: CampaignState;
+  daily: DailyState;
+  ghosts: Record<string, GhostData>;
 }
 
 export interface GameSettings {
@@ -610,7 +695,8 @@ export interface GameSettings {
 
 export interface SaveData {
   version: number;
-  profile: PlayerProfile;
+  profiles: PlayerProfile[];
+  activeProfileId: string;
   settings: GameSettings;
 }
 
@@ -622,4 +708,6 @@ export interface RaceSetup {
   worldId: WorldId;
   difficulty: DifficultyId;
   seed?: number;
+  /** Profile id per seat (seat 0 = active profile); null = guest. */
+  seatProfiles?: (string | null)[];
 }

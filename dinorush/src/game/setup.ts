@@ -1,7 +1,7 @@
 import { AI_COLORS, AI_NAMES, DIFFICULTIES, PLAYER_COLORS } from '../config/difficulty';
 import { Rng } from '../core/rng';
 import { baseLoadout, loadoutFor } from '../progression/rpg';
-import type { PlayerProfile, RaceConfig, RaceSetup } from '../types';
+import type { AIProfileId, PlayerProfile, RaceConfig, RaceSetup } from '../types';
 import type { ParticipantSetup } from './raceEngine';
 
 /**
@@ -15,7 +15,18 @@ export function laneLayout(humans: number): ('h' | 'a')[] {
   return ['a', 'a', 'h', 'a', 'a'];
 }
 
-export function buildParticipants(setup: RaceSetup, profile: PlayerProfile, seed: number): ParticipantSetup[] {
+/**
+ * `lookup` resolves other children's profiles for seats 2 and 3 (their own
+ * name and dinosaurs); guests use the seat defaults of the active profile.
+ * `aiOverride` replaces the difficulty's AI strengths (campaign levels).
+ */
+export function buildParticipants(
+  setup: RaceSetup,
+  profile: PlayerProfile,
+  seed: number,
+  lookup?: (id: string) => PlayerProfile | undefined,
+  aiOverride?: AIProfileId[],
+): ParticipantSetup[] {
   const diff = DIFFICULTIES[setup.difficulty];
   const rng = new Rng(seed ^ 0x5bd1e995);
   const names = [...AI_NAMES];
@@ -31,6 +42,18 @@ export function buildParticipants(setup: RaceSetup, profile: PlayerProfile, seed
     if (kind === 'h') {
       const s = seat++;
       const player = profile.players[s];
+      const ownId = s > 0 ? setup.seatProfiles?.[s] : null;
+      const own = ownId && ownId !== profile.id ? lookup?.(ownId) : undefined;
+      if (own) {
+        return {
+          id: `p${s}`,
+          name: own.players[0].name.slice(0, 14),
+          color: player?.color ?? PLAYER_COLORS[s],
+          kind: 'human',
+          seat: s,
+          loadout: loadoutFor(own, own.players[0].lineup),
+        } satisfies ParticipantSetup;
+      }
       return {
         id: `p${s}`,
         name: (setup.names[s] || player?.name || `Hráč ${s + 1}`).slice(0, 14),
@@ -47,7 +70,7 @@ export function buildParticipants(setup: RaceSetup, profile: PlayerProfile, seed
       color: AI_COLORS[a],
       kind: 'ai',
       seat: -1,
-      aiProfile: diff.aiProfiles[a % diff.aiProfiles.length],
+      aiProfile: (aiOverride ?? diff.aiProfiles)[a % (aiOverride ?? diff.aiProfiles).length],
       loadout: baseLoadout(),
     } satisfies ParticipantSetup;
   });

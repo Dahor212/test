@@ -2,8 +2,11 @@ import { useEffect, useRef } from 'react';
 import { ARCHETYPES } from '../../config/dinosaurs';
 import { sound } from '../../audio/sound';
 import { DinoStage } from '../../render/stage';
+import { MAX_STARS, totalStars } from '../../progression/campaign';
+import { dailyKey } from '../../progression/daily';
+import { profileName } from '../../progression/profile';
 import { store, useApp } from '../../state/store';
-import { Button, CoinCounter, Icon, Modal } from '../components/common';
+import { Button, CoinCounter, Icon, Modal, ProfileAvatar } from '../components/common';
 
 export function MainMenu() {
   const profile = useApp((s) => s.profile);
@@ -54,10 +57,18 @@ export function MainMenu() {
 
   const cup = profile.activeCup;
   const eggs = profile.eggs.pending;
+  const dailyDone = profile.daily.key === dailyKey() && profile.daily.rewarded;
   return (
     <div className="screen menu-screen" data-testid="main-menu">
       <div className="menu-bg" />
       <div className="menu-stage" ref={stageRef} />
+      <button type="button" className="profile-chip" data-testid="profile-chip" onClick={() => store.go('PROFILES')} style={{ ['--pc' as string]: profile.avatar.color }}>
+        <ProfileAvatar avatar={profile.avatar} size={50} />
+        <span className="pc-name">{profileName(profile)}</span>
+        <span className="pc-switch">
+          <Icon name="swap" size={20} />
+        </span>
+      </button>
       <div className="menu-topbar">
         <CoinCounter big />
         <div className="egg-progress" title="Vajíčko">
@@ -73,9 +84,22 @@ export function MainMenu() {
         <div className="logo-sub">Závod evoluce</div>
       </div>
       <div className="menu-actions">
-        <Button color="orange" size="xl" icon="play" onClick={() => store.startSetup()} testId="play" className="play-btn">
-          HRÁT
-        </Button>
+        <div className="menu-main-row">
+          <Button color="green" size="lg" icon="map" onClick={() => store.go('CAMPAIGN')} testId="nav-campaign" className="side-action">
+            Dobrodružství
+            <small className="action-sub">
+              <Icon name="star" size={16} /> {totalStars(profile)}/{MAX_STARS}
+            </small>
+          </Button>
+          <Button color="orange" size="xl" icon="play" onClick={() => store.startSetup()} testId="play" className="play-btn">
+            HRÁT
+          </Button>
+          <Button color="blue" size="lg" icon="calendar" onClick={() => store.openDaily()} testId="nav-daily" className={'side-action' + (dailyDone ? '' : ' has-badge')}>
+            Denní výzva
+            <small className="action-sub">{dailyDone ? 'splněno ✓' : 'nová trať'}</small>
+            {!dailyDone && <b className="badge">!</b>}
+          </Button>
+        </div>
         {cup && !cup.finished && (
           <Button color="yellow" size="md" icon="trophy" onClick={() => store.startCupRace()} testId="continue-cup">
             Pokračovat v poháru ({cup.raceIndex + 1}/5)

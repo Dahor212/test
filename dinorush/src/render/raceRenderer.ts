@@ -1,13 +1,16 @@
 import * as THREE from 'three';
 import { ARCHETYPE_INFO } from '../config/dinosaurs';
 import { WORLDS } from '../config/worlds';
+import type { GhostPlayer } from '../game/ghost';
 import type { RaceEngine } from '../game/raceEngine';
 import type { RaceEvent, RaceParticipant } from '../types';
 import { animateDino, createPtero, createTrex, type DinoRig } from './dinoModels';
+import { GhostVisual } from './ghostVisual';
 import { Particles } from './particles';
 import { RacerVisual } from './racerVisual';
 import { racerHeading, racerLateral, TerrainField, TrackPath } from './trackPath';
 import { TrackScene } from './trackScene';
+import { nameTagTexture } from './textures';
 import { disposeObject } from './util';
 import { applyWorldLighting, WorldScenery } from './worldBuilder';
 
@@ -48,8 +51,10 @@ export class RaceRenderer {
   private tmp = new THREE.Vector3();
   private sun: THREE.DirectionalLight;
   private shadows: boolean;
+  private ghost: GhostVisual | null = null;
+  private ghostLane = 2;
 
-  constructor(container: HTMLElement, engine: RaceEngine, opts: RaceRendererOptions) {
+  constructor(container: HTMLElement, engine: RaceEngine, opts: RaceRendererOptions, ghost: GhostPlayer | null = null) {
     this.container = container;
     this.engine = engine;
     this.opts = opts;
@@ -99,9 +104,23 @@ export class RaceRenderer {
     }
     if (s.trex) {
       this.trex = createTrex();
-      this.trex.root.scale.setScalar(0.85);
+      const boss = s.config.boss;
+      this.trex.root.scale.setScalar(boss ? 1.08 : 0.85);
       this.trex.root.traverse((o) => (o.castShadow = true));
+      if (boss) {
+        // the boss wears its name above the head
+        const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameTagTexture(boss, '#c0392b'), depthWrite: false, depthTest: false }));
+        tag.scale.set(3.2, 0.9, 1);
+        tag.position.y = this.trex.height + 0.8;
+        tag.renderOrder = 20;
+        this.trex.root.add(tag);
+      }
       this.scene.add(this.trex.root);
+    }
+    if (ghost) {
+      this.ghost = new GhostVisual(ghost);
+      this.ghostLane = s.participants.find((p) => p.kind === 'human')?.lane ?? 2;
+      this.scene.add(this.ghost.group);
     }
     if (s.team) {
       this.ptero = createPtero();
@@ -260,6 +279,14 @@ export class RaceRenderer {
       rv.update(dt, this.time, p, seg.terrain, s.phase, this.particles, this.opts.reducedMotion);
       maxPos = Math.max(maxPos, p.position);
     });
+    if (this.ghost) {
+      const gp = this.ghost.positionAt(s.time);
+      const lat = racerLateral(this.path, this.ghostLane, gp) + 1.3;
+      this.path.sample(gp, lat, this.ghost.group.position);
+      this.ghost.group.rotation.y = -racerHeading(this.path, this.ghostLane, gp);
+      this.ghost.group.visible = gp > this.anchor - 2.5;
+      this.ghost.update(dt, this.time, s.time, s.track, s.phase !== 'countdown');
+    }
     const from = this.anchor - 45;
     const to = Math.min(Math.max(this.anchor + 200, maxPos + 40), this.anchor + 320);
     this.track.updateWindow(from, to);
@@ -361,6 +388,7 @@ export class RaceRenderer {
   dispose() {
     this.track.dispose();
     for (const r of this.racers) r.dispose();
+    this.ghost?.dispose();
     if (this.trex) disposeObject(this.trex.root);
     if (this.ptero) disposeObject(this.ptero.root);
     this.world.dispose();

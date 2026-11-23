@@ -1,7 +1,8 @@
 import { sound } from '../../audio/sound';
+import { GhostPlayer, GhostRecorder } from '../../game/ghost';
 import { RaceEngine, type ParticipantSetup } from '../../game/raceEngine';
 import { RaceRenderer } from '../../render/raceRenderer';
-import type { Archetype, GameSettings, RaceConfig, RaceEvent } from '../../types';
+import type { Archetype, GameSettings, GhostData, RaceConfig, RaceEvent } from '../../types';
 
 /** Debug/testing: `?timescale=4` speeds up the simulation. */
 function debugTimeScale(): number {
@@ -36,9 +37,32 @@ export class RaceController {
   /** Hook to adjust the engine before each update (tutorial). */
   beforeUpdate: (() => void) | null = null;
 
-  constructor(container: HTMLElement, config: RaceConfig, participants: ParticipantSetup[], settings: GameSettings) {
+  /** Earlier best run shown as a translucent racer. */
+  readonly ghost: GhostPlayer | null;
+  private recorder: GhostRecorder | null = null;
+  private recordId: string | null = null;
+
+  constructor(
+    container: HTMLElement,
+    config: RaceConfig,
+    participants: ParticipantSetup[],
+    settings: GameSettings,
+    ghost: { data: GhostData | null; record: boolean } = { data: null, record: false },
+  ) {
     this.engine = new RaceEngine(config, participants);
-    this.renderer = new RaceRenderer(container, this.engine, { reducedMotion: settings.reducedMotion, quality: settings.quality });
+    this.ghost = ghost.data ? new GhostPlayer(ghost.data) : null;
+    const humans = participants.filter((p) => p.kind === 'human');
+    if (ghost.record && humans.length === 1) {
+      const rec = new GhostRecorder();
+      const id = humans[0].id;
+      this.recorder = rec;
+      this.recordId = id;
+      this.engine.onStep = () => {
+        const p = this.engine.participant(id);
+        if (p && !p.finished) rec.sample(this.engine.state.time, p.position, p.current);
+      };
+    }
+    this.renderer = new RaceRenderer(container, this.engine, { reducedMotion: settings.reducedMotion, quality: settings.quality }, this.ghost);
     this.onVisibility = () => {
       if (document.visibilityState === 'hidden') {
         this.pause();
@@ -90,6 +114,15 @@ export class RaceController {
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
+  }
+
+  /** The recorded run of the (single) human, if it reached the finish. */
+  recordedGhost(): GhostData | null {
+    if (!this.recorder || !this.recordId) return null;
+    const p = this.engine.participant(this.recordId);
+    if (!p || p.finishTime === null || p.caught) return null;
+    this.recorder.sample(p.finishTime, this.engine.state.track.length, p.current);
+    return this.recorder.finish(p.finishTime, p.name);
   }
 
   press(participantId: string, arch: Archetype): boolean {

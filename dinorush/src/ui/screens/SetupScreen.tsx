@@ -5,7 +5,8 @@ import { WORLD_LIST } from '../../config/worlds';
 import { laneLayout } from '../../game/setup';
 import { store, useApp, type SetupStep } from '../../state/store';
 import type { Archetype, DifficultyId, WorldId } from '../../types';
-import { Button, DinoIcon, DinoThumb, Icon, TopBar } from '../components/common';
+import { profileName } from '../../progression/profile';
+import { Button, DinoIcon, DinoThumb, Icon, ProfileAvatar, TopBar } from '../components/common';
 import { useState } from 'react';
 
 const STEPS: SetupStep[] = ['mode', 'players', 'world', 'difficulty', 'lineup'];
@@ -111,20 +112,7 @@ function PlayersStep({ onNext }: { onNext: () => void }) {
       </div>
       <div className="names-row">
         {Array.from({ length: setup.humans }, (_, i) => (
-          <label key={i} className="name-input" style={{ borderColor: PLAYER_COLORS[i] }}>
-            <span className="name-dot" style={{ background: PLAYER_COLORS[i] }} />
-            <input
-              data-testid={`name-${i}`}
-              value={setup.names[i] ?? ''}
-              maxLength={14}
-              placeholder={`Hráč ${i + 1}`}
-              onChange={(e) => {
-                const names = [...setup.names];
-                names[i] = e.target.value;
-                store.updateSetup({ names });
-              }}
-            />
-          </label>
+          <SeatRow key={i} seat={i} />
         ))}
       </div>
       {setup.humans > 1 && setup.mode !== 'team' && <p className="fair-note"><Icon name="heart" size={22} /> Všichni mají stejně silné dinosaury – rozhoduje postřeh!</p>}
@@ -135,14 +123,74 @@ function PlayersStep({ onNext }: { onNext: () => void }) {
   );
 }
 
-function WorldArt({ id }: { id: WorldId }) {
+/**
+ * One player seat: seat 1 is the active child; seats 2–3 can be another
+ * child's profile (rewards go to that profile) or a guest with a typed name.
+ */
+function SeatRow({ seat }: { seat: number }) {
+  const setup = useApp((s) => s.setup);
+  const profile = useApp((s) => s.profile);
+  const profiles = useApp((s) => s.profiles);
+  const color = PLAYER_COLORS[seat];
+  if (seat === 0) {
+    return (
+      <div className="name-input seat-owner" style={{ borderColor: color }} data-testid="seat-0">
+        <ProfileAvatar avatar={profile.avatar} size={40} />
+        <span className="seat-name">{profileName(profile)}</span>
+      </div>
+    );
+  }
+  const others = profiles.filter((p) => p.id !== profile.id);
+  const chosen = setup.seatProfiles?.[seat] ?? null;
+  const takenElsewhere = (id: string) => (setup.seatProfiles ?? []).some((x, i) => i !== seat && i < setup.humans && x === id);
+  const pick = (id: string | null) => {
+    const seatProfiles = [...(setup.seatProfiles ?? [profile.id, null, null])];
+    seatProfiles[seat] = id;
+    store.updateSetup({ seatProfiles });
+  };
+  return (
+    <div className="name-input seat-row" style={{ borderColor: color }} data-testid={`seat-${seat}`}>
+      <span className="name-dot" style={{ background: color }} />
+      {others.map((o) => (
+        <button
+          type="button"
+          key={o.id}
+          className={'seat-chip' + (chosen === o.id ? ' selected' : '')}
+          disabled={takenElsewhere(o.id)}
+          data-testid={`seat-${seat}-${profileName(o)}`}
+          onClick={() => pick(chosen === o.id ? null : o.id)}
+        >
+          <ProfileAvatar avatar={o.avatar} size={34} />
+          {profileName(o)}
+        </button>
+      ))}
+      {chosen && profiles.some((p) => p.id === chosen) ? null : (
+        <input
+          data-testid={`name-${seat}`}
+          value={setup.names[seat] ?? ''}
+          maxLength={14}
+          placeholder={others.length ? 'Host' : `Hráč ${seat + 1}`}
+          onChange={(e) => {
+            const names = [...setup.names];
+            names[seat] = e.target.value;
+            store.updateSetup({ names });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+export function WorldArt({ id, className = 'world-art' }: { id: WorldId; className?: string }) {
   const art: Record<WorldId, string> = {
     jungle: `<svg viewBox="0 0 200 120"><circle cx="165" cy="25" r="16" fill="#fff36b"/><path d="M0 100 Q50 60 100 90 T200 80 V120 H0Z" fill="#2f8a4a"/><path d="M0 110 Q60 80 120 105 T200 100 V120 H0Z" fill="#46c35a"/><rect x="40" y="45" width="7" height="50" fill="#8a5a2b"/><ellipse cx="44" cy="45" rx="26" ry="9" fill="#2e9e44"/><ellipse cx="44" cy="40" rx="16" ry="8" fill="#46c35a"/><path d="M120 112 Q150 98 200 108" stroke="#2ec4f0" stroke-width="8" fill="none"/></svg>`,
     volcano: `<svg viewBox="0 0 200 120"><path d="M50 110 L100 30 L120 30 L170 110Z" fill="#3a2a28"/><path d="M100 30 L120 30 L114 46 L106 42Z" fill="#ff5a1a"/><circle cx="110" cy="18" r="9" fill="#9a9a9a" opacity="0.8"/><circle cx="122" cy="8" r="7" fill="#b0b0b0" opacity="0.7"/><path d="M0 110 H200 V120 H0Z" fill="#2a2322"/><path d="M20 112 Q40 104 60 112" stroke="#ff9a1a" stroke-width="5" fill="none"/><rect x="130" y="100" width="50" height="6" fill="#a0632e"/></svg>`,
     ice: `<svg viewBox="0 0 200 120"><path d="M20 110 L60 40 L100 110Z" fill="#dcefff"/><path d="M50 58 L60 40 L70 58 Z" fill="#fff"/><path d="M90 110 L140 25 L190 110Z" fill="#bfe0f5"/><path d="M128 46 L140 25 L152 46Z" fill="#fff"/><path d="M0 108 H200 V120 H0Z" fill="#fff"/><g stroke="#fff" stroke-width="3"><path d="M30 20 V36 M22 28 H38 M24 22 L36 34 M36 22 L24 34"/></g></svg>`,
     islands: `<svg viewBox="0 0 200 120"><circle cx="40" cy="25" r="15" fill="#fff36b"/><path d="M0 85 H200 V120 H0Z" fill="#1fc8db"/><ellipse cx="120" cy="88" rx="60" ry="14" fill="#f6e27f"/><path d="M120 85 Q118 60 126 42" stroke="#b07a3c" stroke-width="6" fill="none"/><ellipse cx="128" cy="42" rx="24" ry="6" fill="#4fd06a" transform="rotate(-15 128 42)"/><ellipse cx="124" cy="42" rx="22" ry="6" fill="#2fae52" transform="rotate(25 124 42)"/><path d="M10 100 Q20 95 30 100 M160 105 Q170 100 180 105" stroke="#fff" stroke-width="3" fill="none"/></svg>`,
   };
-  return <span className="world-art" dangerouslySetInnerHTML={{ __html: art[id] }} />;
+  // as a backdrop the art covers the whole area
+  const svg = className === 'map-art' ? art[id].replace('<svg ', '<svg preserveAspectRatio="xMidYMax slice" ') : art[id];
+  return <span className={className} dangerouslySetInnerHTML={{ __html: svg }} />;
 }
 
 function WorldStep({ onNext }: { onNext: () => void }) {
@@ -207,15 +255,24 @@ function DifficultyStep({ onNext }: { onNext: () => void }) {
 
 function LineupStep() {
   const setup = useApp((s) => s.setup);
-  const profile = useApp((s) => s.profile);
+  const active = useApp((s) => s.profile);
+  const profiles = useApp((s) => s.profiles);
   const [seat, setSeat] = useState(0);
-  const lineup = profile.players[seat].lineup;
+  // a seat played by another child uses that child's own dinosaurs
+  const ownerOf = (i: number) => {
+    const id = i > 0 ? setup.seatProfiles?.[i] : null;
+    return (id && profiles.find((p) => p.id === id)) || null;
+  };
+  const owner = ownerOf(seat);
+  const profile = owner ?? active;
+  const slot = owner ? 0 : seat;
+  const lineup = profile.players[slot].lineup;
   const cycle = (a: Archetype, dir: number) => {
     const owned = DINOSAURS.filter((d) => d.archetype === a && profile.dinos[d.id]);
     const i = owned.findIndex((d) => d.id === lineup[a]);
     const nextDef = owned[(i + dir + owned.length) % owned.length];
-    store.updateProfile((p) => {
-      p.players[seat].lineup[a] = nextDef.id;
+    store.updateProfileById(profile.id, (p) => {
+      p.players[slot].lineup[a] = nextDef.id;
     });
   };
   return (
@@ -224,7 +281,7 @@ function LineupStep() {
         <div className="seat-tabs">
           {Array.from({ length: setup.humans }, (_, i) => (
             <button type="button" key={i} className={'seat-tab' + (i === seat ? ' on' : '')} style={{ ['--pc' as string]: PLAYER_COLORS[i] }} onClick={() => setSeat(i)}>
-              {setup.names[i] || `Hráč ${i + 1}`}
+              {i === 0 ? profileName(active) : ownerOf(i) ? profileName(ownerOf(i)!) : setup.names[i] || `Hráč ${i + 1}`}
             </button>
           ))}
         </div>

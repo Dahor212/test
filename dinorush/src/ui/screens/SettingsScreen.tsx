@@ -22,6 +22,7 @@ function Toggle({ on, onChange, testId }: { on: boolean; onChange: (v: boolean) 
 }
 
 export function SettingsScreen() {
+  const profileName = useApp((s) => s.profile.players[0].name);
   const s = useApp((x) => x.settings);
   const [confirm, setConfirm] = useState(0);
   return (
@@ -85,19 +86,19 @@ export function SettingsScreen() {
         </div>
         <div className="setting-row danger">
           <Icon name="trash" size={34} />
-          <span>Smazat postup</span>
+          <span>Smazat postup hráče {profileName}</span>
           <Button color="red" size="sm" onClick={() => setConfirm(1)} testId="reset">
             Začít od nuly
           </Button>
         </div>
-        <p className="about">DinoRUSH – Závod evoluce · verze 0.1 · funguje i bez internetu</p>
+        <p className="about">DinoRUSH – Závod evoluce · verze 0.2 · funguje i bez internetu</p>
       </div>
       {confirm > 0 && (
         <Modal onClose={() => setConfirm(0)}>
           <div className="offer">
             <Icon name="warning" size={60} />
             <h2>{confirm === 1 ? 'Opravdu smazat všechno?' : 'Úplně jistě?'}</h2>
-            <p>Smažou se mince, dinosauři, park i úkoly.</p>
+            <p>Smažou se mince, dinosauři, park, úkoly i hvězdy hráče {profileName}. Ostatní hráči o nic nepřijdou.</p>
             <div className="row">
               <Button color="white" size="md" onClick={() => setConfirm(0)} testId="reset-cancel">
                 Ne, nechat

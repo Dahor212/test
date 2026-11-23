@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
+import { goalIcon, goalText, LEVEL_BY_ID } from '../../config/campaign';
 import { ARCHETYPE_INFO, DINO_BY_ID } from '../../config/dinosaurs';
+import { WORLDS } from '../../config/worlds';
+import { dailySpec, formatDailyValue } from '../../progression/daily';
 import { MODES } from '../../config/modes';
 import { sound } from '../../audio/sound';
 import { store, useApp } from '../../state/store';
 import type { ParticipantResult } from '../../types';
-import { Button, CoinCounter, DinoThumb, formatTime, Icon, Stars } from '../components/common';
+import { Button, CoinCounter, DinoThumb, formatTime, GoalList, Icon, Stars } from '../components/common';
 
 function useCountUp(target: number, ms = 1200) {
   const [v, setV] = useState(0);
@@ -49,17 +52,69 @@ export function ResultsScreen() {
   const mode = MODES[result.config.mode];
   const podium = [result.results[1], result.results[0], result.results[2]].filter(Boolean);
   const heights = { 1: 150, 2: 110, 3: 80 } as Record<number, number>;
+  const camp = last.campaign;
+  const level = camp ? LEVEL_BY_ID[camp.levelId] : null;
+  const daily = last.daily;
+  const dspec = daily ? dailySpec(daily.key) : null;
+  const ghost = last.ghost;
+  const compactPodium = !!(camp || daily);
+  const title = last.tutorial
+    ? 'Výborně! Umíš to!'
+    : camp
+      ? camp.stars > 0
+        ? 'Úroveň splněna!'
+        : 'Skoro! Zkus to znovu'
+      : daily
+        ? 'Denní výzva'
+        : mode.id === 'team'
+          ? result.teamWon
+            ? 'Tým vyhrál!'
+            : 'Příště to dáte!'
+          : 'Výsledky';
 
   return (
     <div className="screen results-screen" data-testid="results">
       <header className="results-head">
-        <h1>
-          {last.tutorial ? 'Výborně! Umíš to!' : mode.id === 'team' ? (result.teamWon ? 'Tým vyhrál!' : 'Příště to dáte!') : 'Výsledky'}
-        </h1>
+        <h1>{title}</h1>
         <CoinCounter big />
       </header>
       <div className="results-body">
-        <div className="podium-wrap">
+        <div className={'podium-wrap' + (compactPodium ? ' compact' : '')}>
+          {camp && level && (
+            <div className={'level-result' + (camp.stars > 0 ? ' passed' : '')} data-testid="campaign-result">
+              <div className="lr-head">
+                <span className="lr-title">
+                  {level.number}. {level.title}
+                </span>
+                <span className="lr-stars" data-testid="level-stars" data-stars={camp.stars}>
+                  <Stars count={camp.stars} size={46} />
+                </span>
+              </div>
+              <GoalList goals={level.goals} met={camp.met} text={goalText} icon={goalIcon} />
+              {camp.newStars > 0 && (
+                <div className="lr-new">
+                  <Icon name="star" size={24} className="star-on" /> Nové hvězdy: +{camp.newStars}
+                </div>
+              )}
+              {camp.unlockedWorld && (
+                <div className="lr-new world">
+                  <Icon name="map" size={24} /> Odemčen nový svět: {WORLDS[camp.unlockedWorld].name}!
+                </div>
+              )}
+            </div>
+          )}
+          {daily && dspec && (
+            <div className={'level-result daily' + (daily.stars > 0 ? ' passed' : '')} data-testid="daily-result">
+              <div className="lr-head">
+                <span className="lr-title">
+                  <Icon name="calendar" size={28} /> {formatDailyValue(dspec.mode, daily.value)}
+                  {daily.improved && <b className="lr-best">Nejlepší dnes!</b>}
+                </span>
+                <Stars count={daily.stars} size={42} />
+              </div>
+              <GoalList goals={dspec.goals} met={daily.met} text={goalText} icon={goalIcon} />
+            </div>
+          )}
           {mode.id === 'team' && (
             <div className={'team-result' + (result.teamWon ? ' won' : '')} data-testid="team-result">
               <Icon name="team" size={30} /> Tým: {formatTime(result.teamTime)} · Ptéro: {formatTime(result.rivalTime)} · Body: {result.teamScore}
@@ -140,6 +195,21 @@ export function ResultsScreen() {
                 </div>
               </div>
             ))}
+            {ghost && ghost.had && (
+              <div className={'record-line ghost-line' + (ghost.beaten ? ' beaten' : '')} data-testid="ghost-result">
+                <Icon name="ghost" size={24} />
+                {ghost.beaten
+                  ? `Duch poražen o ${Math.abs(ghost.delta ?? 0).toFixed(1)} s!`
+                  : ghost.delta !== null
+                    ? `Duch byl rychlejší o ${ghost.delta.toFixed(1)} s`
+                    : 'Duch tentokrát vyhrál'}
+              </div>
+            )}
+            {ghost && !ghost.had && ghost.saved && (
+              <div className="record-line ghost-line" data-testid="ghost-result">
+                <Icon name="ghost" size={24} /> Tvoje jízda se uložila jako duch. Zkus ho příště porazit!
+              </div>
+            )}
             {rewards.records.map((r) => (
               <div key={r} className="record-line">
                 <Icon name="trophy" size={22} /> {r}
@@ -176,9 +246,32 @@ export function ResultsScreen() {
           <Button color="orange" size="lg" icon="play" onClick={() => store.startSetup()} testId="play-after-tutorial">
             Hrát závod!
           </Button>
+        ) : camp ? (
+          <>
+            {camp.nextLevelId && camp.stars > 0 && (
+              <Button color="orange" size="lg" icon="next" onClick={() => store.startCampaignLevel(camp.nextLevelId!)} testId="next-level">
+                Další úroveň
+              </Button>
+            )}
+            <Button color={camp.stars > 0 ? 'blue' : 'orange'} size={camp.stars > 0 ? 'md' : 'lg'} icon="play" onClick={() => race && store.replay(race)} testId="play-again">
+              Zkusit znovu
+            </Button>
+            <Button color="green" size="md" icon="map" onClick={() => store.go('CAMPAIGN')} testId="to-map">
+              Mapa
+            </Button>
+          </>
+        ) : daily ? (
+          <>
+            <Button color="orange" size="lg" icon="play" onClick={() => race && store.replay(race)} testId="play-again">
+              Zkusit znovu
+            </Button>
+            <Button color="blue" size="md" icon="calendar" onClick={() => store.openDaily()} testId="to-daily">
+              Denní tabulka
+            </Button>
+          </>
         ) : (
           <>
-            <Button color="orange" size="lg" icon="play" onClick={() => race && store.startRace(race.config.seed, race.setup)} testId="play-again">
+            <Button color="orange" size="lg" icon="play" onClick={() => race && store.replay(race)} testId="play-again">
               HRÁT ZNOVU
             </Button>
             <Button color="blue" size="md" icon="swap" onClick={() => race && store.startRace(undefined, race.setup)} testId="new-track">

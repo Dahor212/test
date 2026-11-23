@@ -148,3 +148,38 @@ export function formatTime(sec: number | null | undefined): string {
   const s = sec - m * 60;
   return `${m}:${s.toFixed(1).padStart(4, '0')}`;
 }
+
+/** Round avatar of a child profile: chosen dinosaur on the chosen colour. */
+export function ProfileAvatar({ avatar, size = 64 }: { avatar: { archetype: Archetype; color: string }; size?: number }) {
+  return (
+    <span className="profile-avatar" style={{ width: size, height: size, background: avatar.color }}>
+      <DinoIcon archetype={avatar.archetype} size={size * 0.82} />
+    </span>
+  );
+}
+
+/** Star goals of a level / daily challenge; `met` marks the result of the last run. */
+export function GoalList({
+  goals,
+  met,
+  text,
+  icon,
+}: {
+  goals: readonly { kind: string; value: number }[];
+  met?: boolean[];
+  text: (g: never) => string;
+  icon: (g: never) => string;
+}) {
+  return (
+    <ol className="goal-list">
+      {goals.map((g, i) => (
+        <li key={i} className={met ? (met[i] ? 'met' : 'missed') : ''}>
+          <Icon name="star" size={26} className={met ? (met[i] ? 'star-on' : 'star-off') : 'star-on'} />
+          <Icon name={icon(g as never)} size={24} className="goal-icon" />
+          <span>{text(g as never)}</span>
+          {met && <Icon name={met[i] ? 'check' : 'close'} size={22} className="goal-state" />}
+        </li>
+      ))}
+    </ol>
+  );
+}

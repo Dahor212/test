@@ -58,14 +58,14 @@ export function RaceScreen({ session }: { session: RaceSession }) {
     const el = viewRef.current!;
     preloadSignImages().then(() => {
       if (disposed) return;
-      ctrl = new RaceController(el, session.config, session.participants, store.get().settings);
+      ctrl = new RaceController(el, session.config, session.participants, store.get().settings, { data: session.ghost, record: !!session.ghostKey });
       ctrlRef.current = ctrl;
       (window as unknown as { __race?: RaceController }).__race = ctrl;
       ctrl.onPauseChange = (p) => setPaused(p);
       ctrl.onFinished = () => {
         if (finishedRef.current) return;
         finishedRef.current = true;
-        store.finishRace(ctrl!.engine.getResult());
+        store.finishRace(ctrl!.engine.getResult(), ctrl!.recordedGhost());
       };
       if (tutorialRef.current) {
         const dir = tutorialRef.current;
@@ -201,6 +201,20 @@ export function RaceScreen({ session }: { session: RaceSession }) {
                 {countdownText}
               </div>
             )}
+            {state.phase === 'countdown' && (session.config.boss || session.ghost) && (
+              <div className="race-intro" data-testid="race-intro">
+                {session.config.boss && (
+                  <span className="intro-boss">
+                    <Icon name="trex" size={34} /> {session.config.boss}
+                  </span>
+                )}
+                {session.ghost && (
+                  <span className="intro-ghost">
+                    <Icon name="ghost" size={30} /> Závodíš se svým duchem ({session.ghost.time.toFixed(1)} s)
+                  </span>
+                )}
+              </div>
+            )}
             {banner && (
               <div className="event-banner" key={banner.id}>
                 <Icon name="warning" size={44} />
@@ -260,7 +274,7 @@ export function RaceScreen({ session }: { session: RaceSession }) {
               </Button>
             )}
             {!session.tutorial && mode.id !== 'cup' && (
-              <Button color="blue" size="md" icon="swap" onClick={() => store.startRace(session.config.seed, session.setup)} testId="restart">
+              <Button color="blue" size="md" icon="swap" onClick={() => store.replay(session)} testId="restart">
                 Začít znovu
               </Button>
             )}
@@ -359,6 +373,11 @@ function HudTop({ ctrl }: { ctrl: RaceController }) {
             {s.trex && (
               <div className="tp-marker trex" style={{ left: `${Math.max(0, Math.min(1, s.trex.position / len)) * 100}%` }}>
                 <Icon name="trex" size={20} />
+              </div>
+            )}
+            {ctrl.ghost && (
+              <div className="tp-marker ghost" data-testid="ghost-marker" style={{ left: `${Math.max(0, Math.min(1, ctrl.ghost.positionAt(s.time) / len)) * 100}%` }}>
+                <Icon name="ghost" size={18} />
               </div>
             )}
             {s.team && (
@@ -479,6 +498,7 @@ function PlayerPanel({
   const wrongNow = s.phase === 'racing' && !p.finished && p.current !== seg.recommended && !p.prepared;
   const cooldown = p.sinceSwitch < p.switchCooldown;
   const trexGap = s.trex && !p.caught && !p.finished ? Math.round(p.position - s.trex.position) : null;
+  const ghostGap = ctrl.ghost && s.phase === 'racing' && !p.finished ? Math.round(p.position - ctrl.ghost.positionAt(s.time)) : null;
   const total = s.participants.length;
   // speed meter: relative to a fast correct run
   const rel = Math.max(0, Math.min(1, p.speed / (diff.baseSpeed * 1.45)));
@@ -555,6 +575,13 @@ function PlayerPanel({
             </span>
           )}
           {mode.ranking === 'score' && <span className="mini-stat">{p.score}</span>}
+          {ghostGap !== null && (
+            <span className={'mini-stat ghost-gap' + (ghostGap >= 0 ? ' ahead' : ' behind')} data-testid={`ghost-gap-${p.seat}`} title="Odstup od ducha">
+              <Icon name="ghost" size={18} />
+              {ghostGap >= 0 ? '+' : '−'}
+              {Math.abs(ghostGap)} m
+            </span>
+          )}
           {trexGap !== null && (
             <span className={'mini-stat trex-gap' + (trexGap < 12 ? ' danger' : '')} data-testid={`trex-gap-${p.seat}`}>
               <Icon name="trex" size={18} />

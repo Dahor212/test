@@ -57,6 +57,15 @@ export const DIFFICULTIES: Record<DifficultyId, GameDifficulty> = {
 export const DIFFICULTY_LIST = Object.values(DIFFICULTIES);
 
 export const AI_PROFILES: Record<AIProfileId, AIProfile> = {
+  /** Gentle opponents for the first levels of each adventure world. */
+  rookie: {
+    id: 'rookie',
+    name: 'Nováček',
+    accuracy: 0.6,
+    reaction: [1.0, 1.7],
+    perfectSkill: 0.12,
+    recovery: [1.6, 2.6],
+  },
   beginner: {
     id: 'beginner',
     name: 'Začátečník',

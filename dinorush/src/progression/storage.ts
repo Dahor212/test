@@ -1,23 +1,28 @@
 import { ACCESSORY_BY_ID, DINO_BY_ID } from '../config/dinosaurs';
+import { LEVEL_BY_ID } from '../config/campaign';
+import { ARCHETYPES } from '../config/dinosaurs';
 import { DIFFICULTIES } from '../config/difficulty';
 import { DECORATIONS, PARK_SIZE } from '../config/economy';
 import { MODES } from '../config/modes';
 import { WORLDS } from '../config/worlds';
 import type {
+  Archetype,
   CupState,
+  DailyState,
   DecorationId,
   DinosaurInstance,
   GameSettings,
+  GhostData,
   LifetimeStats,
   PlayerProfile,
   RaceSetup,
   SaveData,
 } from '../types';
-import { createDefaultProfile, createDefaultSettings, createDinoInstance, defaultStats } from './profile';
+import { AVATAR_COLORS, createDefaultProfile, createDefaultSettings, createDinoInstance, defaultStats, emptyDaily, MAX_PROFILES, newProfileId } from './profile';
 import { levelForXp, repairLineup } from './rpg';
 
 export const SAVE_KEY = 'dinorush.save';
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export interface StorageLike {
   getItem(key: string): string | null;
@@ -131,6 +136,9 @@ function sanitizeCup(raw: unknown): CupState | null {
       colors: rec(raw.colors) as Record<string, string>,
       races: Array.isArray(raw.races) ? (raw.races.filter(isObj) as unknown as CupState['races']) : [],
       finished: bool(raw.finished, false),
+      seatProfiles: Array.isArray(raw.seatProfiles)
+        ? raw.seatProfiles.slice(0, 3).map((x) => (typeof x === 'string' ? x.slice(0, 24) : null))
+        : undefined,
     };
   } catch {
     return null;
@@ -208,7 +216,53 @@ export function sanitizeProfile(raw: unknown): PlayerProfile {
   p.cupHistory = Array.isArray(raw.cupHistory) ? (raw.cupHistory.filter(isObj).slice(-10) as never) : [];
   p.tutorialDone = bool(raw.tutorialDone, false);
   p.lastSetup = sanitizeSetup(raw.lastSetup);
+  p.id = typeof raw.id === 'string' && /^[a-z0-9]{2,24}$/i.test(raw.id) ? raw.id : newProfileId();
+  const av = isObj(raw.avatar) ? raw.avatar : {};
+  p.avatar = {
+    archetype: typeof av.archetype === 'string' && (ARCHETYPES as string[]).includes(av.archetype) ? (av.archetype as Archetype) : 'raptor',
+    color: typeof av.color === 'string' && /^#[0-9a-f]{6}$/i.test(av.color) ? av.color : AVATAR_COLORS[0],
+  };
+  const cp = isObj(raw.campaign) ? raw.campaign : {};
+  const stars: Record<string, number> = {};
+  if (isObj(cp.stars)) for (const [k, v] of Object.entries(cp.stars)) if (LEVEL_BY_ID[k]) stars[k] = Math.round(num(v, 0, 0, 3));
+  p.campaign = {
+    difficulty: typeof cp.difficulty === 'string' && cp.difficulty in DIFFICULTIES ? (cp.difficulty as PlayerProfile['campaign']['difficulty']) : 'racer',
+    stars,
+  };
+  p.daily = sanitizeDaily(raw.daily);
+  p.ghosts = {};
+  if (isObj(raw.ghosts)) {
+    for (const [k, v] of Object.entries(raw.ghosts).slice(0, 80)) {
+      const g = sanitizeGhost(v);
+      if (g) p.ghosts[k.slice(0, 60)] = g;
+    }
+  }
   return p;
+}
+
+function sanitizeDaily(raw: unknown): DailyState {
+  const d = emptyDaily();
+  if (!isObj(raw)) return d;
+  return {
+    key: typeof raw.key === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.key) ? raw.key : '',
+    best: typeof raw.best === 'number' && Number.isFinite(raw.best) ? raw.best : null,
+    stars: Math.round(num(raw.stars, 0, 0, 3)),
+    rewarded: bool(raw.rewarded, false),
+    completed: Math.floor(num(raw.completed, 0, 0, 1e6)),
+  };
+}
+
+export function sanitizeGhost(raw: unknown): GhostData | null {
+  if (!isObj(raw)) return null;
+  const pos = Array.isArray(raw.pos) ? raw.pos : null;
+  const arch = typeof raw.arch === 'string' ? raw.arch : '';
+  if (!pos || pos.length < 2 || pos.length > 4000 || arch.length !== pos.length) return null;
+  if (!pos.every((x) => typeof x === 'number' && Number.isFinite(x))) return null;
+  if (!/^[rsat]+$/.test(arch)) return null;
+  const dt = num(raw.dt, 0.5, 0.05, 5);
+  const time = num(raw.time, 0, 0, 3600);
+  if (time <= 0) return null;
+  return { v: 1, dt, pos: pos as number[], arch, time, name: str(raw.name, 'Duch', 14), at: num(raw.at, 0, 0) };
 }
 
 export function sanitizeSettings(raw: unknown): GameSettings {
@@ -238,6 +292,14 @@ const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string
     }
     return { ...raw, profile, version: 2 };
   },
+  // v2 had one profile per tablet; v3 keeps a list of child profiles.
+  2: (raw) => {
+    const profile = isObj(raw.profile) ? { ...raw.profile } : {};
+    if (typeof profile.id !== 'string') profile.id = 'pf1';
+    const { profile: _old, ...rest } = raw;
+    void _old;
+    return { ...rest, profiles: [profile], activeProfileId: profile.id, version: 3 };
+  },
 };
 
 export function migrate(raw: Record<string, unknown>): Record<string, unknown> {
@@ -253,7 +315,24 @@ export function migrate(raw: Record<string, unknown>): Record<string, unknown> {
 }
 
 export function defaultSave(): SaveData {
-  return { version: SAVE_VERSION, profile: createDefaultProfile(), settings: createDefaultSettings() };
+  const profile = createDefaultProfile();
+  return { version: SAVE_VERSION, profiles: [profile], activeProfileId: profile.id, settings: createDefaultSettings() };
+}
+
+/** Sanitises the profile list: at least one profile, unique ids, valid active id. */
+export function sanitizeProfiles(rawList: unknown, rawActive: unknown): { profiles: PlayerProfile[]; activeProfileId: string } {
+  const list = Array.isArray(rawList) ? rawList.slice(0, MAX_PROFILES) : [];
+  const profiles: PlayerProfile[] = [];
+  const ids = new Set<string>();
+  for (const r of list) {
+    const p = sanitizeProfile(r);
+    while (ids.has(p.id)) p.id = newProfileId();
+    ids.add(p.id);
+    profiles.push(p);
+  }
+  if (!profiles.length) profiles.push(createDefaultProfile());
+  const activeProfileId = typeof rawActive === 'string' && ids.has(rawActive) ? rawActive : profiles[0].id;
+  return { profiles, activeProfileId };
 }
 
 export function loadSave(storage: StorageLike = getStorage()): SaveData {
@@ -268,9 +347,11 @@ export function loadSave(storage: StorageLike = getStorage()): SaveData {
     const parsed = JSON.parse(raw);
     if (!isObj(parsed)) throw new Error('bad save');
     const migrated = migrate(parsed);
+    const { profiles, activeProfileId } = sanitizeProfiles(migrated.profiles, migrated.activeProfileId);
     return {
       version: SAVE_VERSION,
-      profile: sanitizeProfile(migrated.profile),
+      profiles,
+      activeProfileId,
       settings: sanitizeSettings(migrated.settings),
     };
   } catch {

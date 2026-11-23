@@ -150,6 +150,42 @@ export const MISSIONS: MissionDefinition[] = [
     metric: (s) => s.abilitiesUsed,
     reward: { coins: 70 },
   },
+  {
+    id: 'stars10',
+    title: 'Hvězdný dobrodruh',
+    description: 'Získej 10 hvězd v Dobrodružství',
+    icon: 'map',
+    target: 10,
+    metric: (_s, p) => Object.values(p.campaign.stars).reduce((a, b) => a + b, 0),
+    reward: { coins: 100 },
+  },
+  {
+    id: 'boss1',
+    title: 'Krotitel T-Rexe',
+    description: 'Poraz prvního T-Rex bosse v Dobrodružství',
+    icon: 'trex',
+    target: 1,
+    metric: (_s, p) => ((p.campaign.stars['jungle-6'] ?? 0) > 0 ? 1 : 0),
+    reward: { coins: 100 },
+  },
+  {
+    id: 'daily3',
+    title: 'Denní závodník',
+    description: 'Splň 3 denní výzvy (kdykoli, nemusí být za sebou)',
+    icon: 'calendar',
+    target: 3,
+    metric: (_s, p) => p.daily.completed,
+    reward: { coins: 80 },
+  },
+  {
+    id: 'ghost1',
+    title: 'Rychlejší než duch',
+    description: 'Poraz svého ducha z minulé jízdy',
+    icon: 'ghost',
+    target: 1,
+    metric: (s) => s.ghostsBeaten,
+    reward: { coins: 50 },
+  },
 ];
 
 export const MISSION_BY_ID = Object.fromEntries(MISSIONS.map((m) => [m.id, m]));

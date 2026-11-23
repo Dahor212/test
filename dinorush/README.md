@@ -1,7 +1,7 @@
 # DinoRUSH – Závod evoluce
 
 Dětská 3D arkádová závodní hra pro tablet (landscape), určená zhruba pro děti od 4 do 9 let.
-Tři dinosauří závodníci běží sami. Hráč jen včas vybírá správného dinosaura pro terén, který se blíží:
+Pět dinosauřích závodníků běží samo. Hráč jen včas vybírá správného dinosaura pro terén, který se blíží:
 
 | Terén | Nejlepší dinosaurus |
 |---|---|
@@ -27,10 +27,10 @@ npm run dev          # vývojový server (http://localhost:5173 + adresa v síti
 Další příkazy:
 
 ```bash
-npm test             # 68 unit testů herní logiky (Vitest)
+npm test             # 85 unit testů herní logiky (Vitest)
 npm run build        # typová kontrola + produkční build do dist/
 npm run preview      # spuštění produkčního buildu (http://localhost:4173)
-npm run e2e          # build + 21 end-to-end testů v Chromiu (Playwright)
+npm run e2e          # build + 25 end-to-end testů v Chromiu (Playwright)
 ```
 
 > `npm run e2e` potřebuje nainstalovaný Playwright s Chromiem (`npm i -D playwright && npx playwright install chromium`).
@@ -109,6 +109,7 @@ dinorush/
 │  │  ├─ worlds.ts                 # 4 světy (pool terénů, události, barvy, mlha, světla)
 │  │  ├─ difficulty.ts             # 3 obtížnosti + profily AI
 │  │  ├─ modes.ts                  # 6 herních režimů + pravidla poháru
+│  │  ├─ campaign.ts               # Dobrodružství: 24 úrovní ve 4 světech, cíle hvězd, T-Rex bossové
 │  │  ├─ economy.ts                # odměny, XP úrovně, ceny vylepšení, sekvence vajíček, dekorace
 │  │  └─ missions.ts               # úkoly (podmínka = funkce nad statistikami)
 │  ├─ core/rng.ts                  # deterministický seedovaný generátor
@@ -120,8 +121,10 @@ dinorush/
 │  │  ├─ modes.ts                  # pravidla režimů (T-Rex, pohár, endless, zlatá horečka, tým)
 │  │  ├─ ai.ts                     # AI soupeři (reakční doba, přesnost, chyby, oprava chyb)
 │  │  ├─ tutorial.ts               # řízení interaktivního tutoriálu
+│  │  ├─ ghost.ts                  # záznam a přehrávání jízdy (duch vlastního rekordu)
 │  │  └─ setup.ts                  # sestavení závodníků a drah z nastavení
-│  ├─ progression/                 # profil, verzované ukládání, odměny, RPG, vajíčka, úkoly, park, pohár
+│  ├─ progression/                 # profily, verzované ukládání, odměny, RPG, vajíčka, úkoly, park, pohár,
+│  │                               #   campaign.ts (hvězdy, odemykání), daily.ts (denní výzva)
 │  ├─ render/                      # 3D VYKRESLOVÁNÍ (jen čte stav enginu)
 │  │  ├─ creature.ts               # „modelovací dílna“: plynulá těla (loft), kostra, šupinatá kůže, klouby
 │  │  ├─ dinoModels.ts             # Velociraptor, Spinosaurus, Ankylosaurus, Triceratops, T-Rex, Ptéro + animace chůze/plavání
@@ -132,18 +135,20 @@ dinorush/
 │  │  ├─ worldBuilder.ts           # kopce údolí, vegetace podél zatáček, hory, moře, počasí
 │  │  ├─ raceRenderer.ts           # scéna, kamera jedoucí za dinosaury, efekty z událostí
 │  │  ├─ racerVisual.ts            # závodník: 4 modely, proměna, aura schopnosti, prach/cákance
+│  │  ├─ ghostVisual.ts            # průsvitný duch předchozí nejlepší jízdy
 │  │  ├─ particles.ts              # částice v jednom draw callu
 │  │  ├─ stage.ts / parkRenderer.ts# 3D náhledy v menu/sbírce/vejcích a 3D Dino Park
 │  │  └─ textures.ts               # procedurální textury terénu a značek (canvas)
 │  ├─ audio/sound.ts               # syntetizované efekty + jednoduchá hudba (Web Audio)
-│  ├─ state/store.ts               # stavový automat aplikace (MENU, RACE_SETUP, RACE, REWARDS…)
+│  ├─ state/store.ts               # stavový automat aplikace (PROFILES, MENU, CAMPAIGN, DAILY, RACE, REWARDS…)
 │  ├─ ui/                          # React obrazovky a herní HUD
 │  │  ├─ race/RaceController.ts    # smyčka rAF, pauza, přechod na pozadí, úklid zdrojů
 │  │  ├─ race/RaceScreen.tsx       # 3D + HUD + ovládací panely 1–3 hráčů (Pointer Events)
-│  │  └─ screens/                  # menu, nastavení závodu, výsledky, pohár, sbírka, vajíčka, park, úkoly, nastavení
+│  │  └─ screens/                  # profily, menu, mapa dobrodružství, denní výzva, nastavení závodu, výsledky,
+│  │                               #   pohár, sbírka, vajíčka, park, úkoly, nastavení
 │  └─ styles/app.css
-├─ tests/                          # Vitest – generátor, engine, AI, režimy, ekonomika, ukládání
-└─ e2e/run-e2e.mjs                 # Playwright – 21 scénářů včetně multi-touch a offline PWA
+├─ tests/                          # Vitest – generátor, engine, AI, režimy, ekonomika, ukládání, kampaň, duch, profily
+└─ e2e/run-e2e.mjs                 # Playwright – 25 scénářů včetně multi-touch, offline PWA, dobrodružství a profilů
 ```
 
 **Prohlížeč modelů pro vývoj**: při `npm run dev` otevřete `http://localhost:5173/dev/dinos.html`
@@ -182,14 +187,21 @@ dinorush/
 
 **Progrese**: mince a XP po každém závodě (rozpis odměn). 10 úrovní dinosaurů. Vylepšení RYCHLOST / PROMĚNA / VÝDRŽ za mince (5 stupňů, podmíněno úrovní, každé má měřitelný vliv). Sbírka s 3D náhledy, 12 dinosaurů (4 základní a 8 variant se sólo perky) a 5 doplňků (čepička, brýle, korunka, šála, kytička), které jsou vidět i ve 3D. Sestavení aktivní čtveřice (vždy pokrývá všechny 4 schopnosti). Vajíčko po každých 3 závodech podle předvídatelné sekvence, s animací třesení, prasklin, rozlomení a odhalení. Dino Park 5×4 ve 3D s nákupem 10 dekorací, umístěním, přesunem, uklizením a dinosaury, kteří se procházejí. 16 automaticky vyhodnocovaných úkolů a rekordy.
 
+**Dlouhodobá motivace**
+- **Profily hráčů („Kdo hraje?“)**: až 4 děti na jednom tabletu. Každé má vlastní jméno, avatara (dinosaurus + barva), mince, dinosaury, park, úkoly, hvězdy a duchy. Při spuštění s více profily se hra nejdřív zeptá, kdo hraje. Ve společném závodě si na 2. a 3. místo lze vybrat jiný profil (závodí se svými dinosaury a odměny dostane do svého profilu) nebo hosta.
+- **Dobrodružství (mapa)**: 4 světy po 6 úrovních s pevnými tratěmi. Úrovně kombinují klasický závod, zlatou horečku a útěk před T-Rexem. Na konci každého světa je **T-Rex boss** (větší, se jménem, rychlejší), jehož poražení odemkne další svět a dá vajíčko a 100 mincí. Každá úroveň má 3 hvězdy za konkrétní cíle (např. „Doběhni do 3. místa“, „Vyhraj“, „Kombo 6×“, „Nejvýš 2 chyby“). První cíl je podmínkou postupu. Za každou novou hvězdu je 20 mincí. Obtížnost dobrodružství si každý profil volí sám. Síla soupeřů a rychlost T-Rexe byly vyladěné simulací: průměrný „dětský“ bot (asi 75 % správných voleb, pozdní reakce) projde na obtížnosti Dino závodník bosse v 30–80 % pokusů, perfektní hráč má všude 3 hvězdy.
+- **Denní výzva**: každý den jedna nová trať (střídají se světy i režimy), stejná pro všechny. Za první dokončení dne +50 mincí, za 3 hvězdy +30. **Rodinná tabulka** ukazuje dnešní nejlepší výsledky všech profilů. Žádné série: vynechaný den nic nebere.
+- **Duch vlastního rekordu**: hra zaznamená tvoji nejlepší jízdu na úrovni dobrodružství a v denní výzvě (a i u „HRÁT ZNOVU“ na stejné trati). Při dalším pokusu běží vedle tebe průsvitný dinosaurus „Duch“, na ukazateli postupu je jeho značka a v panelu odstup v metrech. Ve výsledcích se ukáže, o kolik sekund jsi ducha porazil(a).
+- 4 nové úkoly: Hvězdný dobrodruh, Krotitel T-Rexe, Denní závodník, Rychlejší než duch.
+
 **Ostatní**: interaktivní tutoriál na skutečné trati (zpomalení, zvýraznění tlačítka, lze přeskočit). Syntetizované zvuky (~22 efektů) a hudba, startují až po dotyku. Nastavení (hlasitost, hudba, efekty, omezení animací, kvalita grafiky, výchozí obtížnost, znovu tutoriál, smazání postupu s dvojitým potvrzením). Verzované ukládání s migrací, validací a zálohou poškozených dat. Pauza při přechodu na pozadí. Výzva k otočení na šířku. PWA instalace a offline režim. Podpora klávesnice na PC (hráč 1: `1–4` / `A S D F`, hráč 2: `Q W E R`, hráč 3: `U I O P`, pauza `Esc` / mezerník).
 
 ## 7. Testy
 
-- `npm test`: 68 unit testů. Pokrývají determinismus a validitu tratí pro všechny světy a obtížnosti, násobiče rychlosti, cooldown, perfektní proměnu (i to, že dřívější reakce nezpomalí), kombo, schopnosti, překážky, pořadí v cíli, přesnost a sílu AI, délku závodů 90–150 s, všech 6 režimů, normalizaci v multiplayeru, odměny, vylepšení, vajíčka, park, úkoly, pohár, ukládání (včetně poškozených dat a migrace).
-- `npm run e2e`: 21 scénářů v Chromiu. Odpovídají testům 1–20 ze zadání a navíc testují tutoriál. Používají skutečné dotyky přes CDP, včetně tří prstů najednou, emulaci iPadu, simulaci přechodu na pozadí a offline režim. Výsledek: `e2e/out/report.md` a screenshoty v `e2e/out/`.
+- `npm test`: 85 unit testů. Pokrývají determinismus a validitu tratí pro všechny světy a obtížnosti, násobiče rychlosti, cooldown, perfektní proměnu (i to, že dřívější reakce nezpomalí), kombo, schopnosti, překážky, pořadí v cíli, přesnost a sílu AI, délku závodů 90–150 s, všech 6 režimů, normalizaci v multiplayeru, odměny, vylepšení, vajíčka, park, úkoly, pohár, ukládání (včetně poškozených dat a migrace).
+- `npm run e2e`: 25 scénářů v Chromiu. Odpovídají testům 1–20 ze zadání a navíc testují tutoriál, dobrodružství (hvězdy, odemčení, uložení), ducha, denní výzvu s rodinnou tabulkou a profily (nový hráč, společný závod s odměnami pro oba, výběr hráče po spuštění). Používají skutečné dotyky přes CDP, včetně tří prstů najednou, emulaci iPadu, simulaci přechodu na pozadí a offline režim. Výsledek: `e2e/out/report.md` a screenshoty v `e2e/out/`.
 
-Poslední běh: **68/68 unit testů a 21/21 E2E scénářů prošlo.**
+Poslední běh: **85/85 unit testů a 25/25 E2E scénářů prošlo.**
 
 ## 8. Omezení první verze
 
@@ -200,7 +212,6 @@ Poslední běh: **68/68 unit testů a 21/21 E2E scénářů prošlo.**
 - Kamera sleduje posledního lidského hráče. Počítačový soupeř, který běží těsně za ním, se skryje, aby nezakrýval výhled (v pořadí je dál vidět). Když se hráči hodně rozdělí, ten vepředu je v obraze menší.
 - Dynamické události mění vždy jen jeden úsek. Kombinované víceúsekové události zatím nejsou.
 - Hudba je jedna krátká smyčka pro menu a jedna pro závod.
-- Jeden společný profil pro celý tablet. Mince z multiplayeru se sčítají do jedné peněženky.
 - V lokální síti přes `http://` nefunguje offline režim (omezení prohlížečů), viz kapitola 4.
 
 ## 9. Návrhy dalšího rozvoje

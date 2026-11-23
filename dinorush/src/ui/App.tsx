@@ -3,12 +3,15 @@ import { sound } from '../audio/sound';
 import { store, useApp } from '../state/store';
 import { Icon, Toasts } from './components/common';
 import { RaceScreen } from './race/RaceScreen';
+import { CampaignScreen } from './screens/CampaignScreen';
 import { CollectionScreen } from './screens/CollectionScreen';
 import { CupScreen } from './screens/CupScreen';
+import { DailyScreen } from './screens/DailyScreen';
 import { EggScreen } from './screens/EggScreen';
 import { MainMenu } from './screens/MainMenu';
 import { MissionsScreen } from './screens/MissionsScreen';
 import { ParkScreen } from './screens/ParkScreen';
+import { ProfilesScreen } from './screens/ProfilesScreen';
 import { ResultsScreen } from './screens/ResultsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { SetupScreen } from './screens/SetupScreen';
@@ -36,8 +39,17 @@ export function App() {
 
   let content: React.ReactNode = null;
   switch (screen) {
+    case 'PROFILES':
+      content = <ProfilesScreen />;
+      break;
     case 'MENU':
       content = <MainMenu />;
+      break;
+    case 'CAMPAIGN':
+      content = <CampaignScreen />;
+      break;
+    case 'DAILY':
+      content = <DailyScreen />;
       break;
     case 'RACE_SETUP':
       content = <SetupScreen />;

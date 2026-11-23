@@ -153,13 +153,13 @@ describe('save system (TEST 13)', () => {
   it('round-trips the profile', () => {
     const store = new MemStore();
     const save = defaultSave();
-    save.profile.coins = 777;
-    save.profile.park.cells[5] = 'pond';
+    save.profiles[0].coins = 777;
+    save.profiles[0].park.cells[5] = 'pond';
     save.settings.music = false;
     writeSave(save, store);
     const loaded = loadSave(store);
-    expect(loaded.profile.coins).toBe(777);
-    expect(loaded.profile.park.cells[5]).toBe('pond');
+    expect(loaded.profiles[0].coins).toBe(777);
+    expect(loaded.profiles[0].park.cells[5]).toBe('pond');
     expect(loaded.settings.music).toBe(false);
   });
 
@@ -167,33 +167,35 @@ describe('save system (TEST 13)', () => {
     const store = new MemStore();
     store.setItem(SAVE_KEY, '{not json');
     const s = loadSave(store);
-    expect(s.profile.coins).toBe(100);
+    expect(s.profiles[0].coins).toBe(100);
     expect(store.getItem(SAVE_KEY + '.corrupt')).toBe('{not json');
 
     store.setItem(SAVE_KEY, JSON.stringify({ version: 2, profile: { coins: 'lots', dinos: { nope: {} }, park: { cells: 'x' } }, settings: 5 }));
     const s2 = loadSave(store);
-    expect(s2.profile.coins).toBe(100);
-    expect(s2.profile.dinos['raptor-green']).toBeDefined();
-    expect(s2.profile.park.cells).toHaveLength(20);
+    expect(s2.profiles[0].coins).toBe(100);
+    expect(s2.profiles[0].dinos['raptor-green']).toBeDefined();
+    expect(s2.profiles[0].park.cells).toHaveLength(20);
   });
 
   it('migrates old versions', () => {
     const store = new MemStore();
     store.setItem(SAVE_KEY, JSON.stringify({ version: 1, profile: { coins: 50, parkCells: ['tree', null, 'pond'] } }));
     const s = loadSave(store);
-    expect(s.version).toBe(2);
-    expect(s.profile.coins).toBe(50);
-    expect(s.profile.park.cells[0]).toBe('tree');
-    expect(s.profile.park.cells[2]).toBe('pond');
+    expect(s.version).toBe(3);
+    expect(s.profiles).toHaveLength(1);
+    expect(s.activeProfileId).toBe(s.profiles[0].id);
+    expect(s.profiles[0].coins).toBe(50);
+    expect(s.profiles[0].park.cells[0]).toBe('tree');
+    expect(s.profiles[0].park.cells[2]).toBe('pond');
   });
 
   it('repairs lineups that reference unknown dinos', () => {
     const store = new MemStore();
     const save = defaultSave();
-    const prof = cloneProfile(save.profile) as unknown as Record<string, unknown>;
+    const prof = cloneProfile(save.profiles[0]) as unknown as Record<string, unknown>;
     (prof.players as { lineup: Record<string, string> }[])[0].lineup.raptor = 'raptor-gold';
-    store.setItem(SAVE_KEY, JSON.stringify({ ...save, profile: prof }));
-    expect(loadSave(store).profile.players[0].lineup.raptor).toBe('raptor-green');
+    store.setItem(SAVE_KEY, JSON.stringify({ ...save, profiles: [prof] }));
+    expect(loadSave(store).profiles[0].players[0].lineup.raptor).toBe('raptor-green');
   });
 });
 

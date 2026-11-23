@@ -37,6 +37,18 @@ export interface RewardSummary {
 
 const competitiveModes = new Set(['classic', 'cup', 'goldRush', 'trex', 'endless']);
 
+/**
+ * The race as seen by one child profile: only its own seats count as human,
+ * so coins, XP, stats and missions land in the right profile when siblings
+ * race together.
+ */
+export function resultForSeats(result: RaceResult, seats: number[]): RaceResult {
+  return {
+    ...result,
+    results: result.results.map((r) => (r.kind === 'human' && !seats.includes(r.seat) ? { ...r, kind: 'ai' as const } : r)),
+  };
+}
+
 /** Pure computation of coin lines for one human result. */
 export function coinLines(result: RaceResult, r: ParticipantResult): CoinLine[] {
   const mode = result.config.mode;
@@ -133,7 +145,8 @@ export function applyRaceResult(profile: PlayerProfile, result: RaceResult): Rew
   const records: string[] = [];
   const rec = profile.records;
   for (const r of humans) {
-    if ((mode === 'classic' || mode === 'cup') && r.finishTime) {
+    // adventure / daily tracks have their own lengths – they keep their own bests
+    if ((mode === 'classic' || mode === 'cup') && r.finishTime && !result.config.context) {
       const key = `${result.config.worldId}-${result.config.difficulty}`;
       if (!rec.bestTimes[key] || r.finishTime < rec.bestTimes[key]) {
         rec.bestTimes[key] = Math.round(r.finishTime * 100) / 100;

@@ -78,7 +78,7 @@ const trex: ModeRules = {
   id: 'trex',
   init(e) {
     const d = e.difficulty;
-    e.state.trex = { position: -C.trex.startGap, speed: d.baseSpeed * d.trexSpeedFactor, caught: [] };
+    e.state.trex = { position: -C.trex.startGap, speed: d.baseSpeed * d.trexSpeedFactor * (e.state.config.trexFactor ?? 1), caught: [] };
   },
   tick(e, dt) {
     const t = e.state.trex!;

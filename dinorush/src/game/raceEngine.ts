@@ -63,6 +63,8 @@ export class RaceEngine {
   private bonus = new Map<string, number>();
   /** Optional listener for every emitted event (renderer/audio hook). */
   onEvent: ((e: RaceEvent) => void) | null = null;
+  /** Called after every simulation step while racing (ghost recording). */
+  onStep: (() => void) | null = null;
 
   constructor(config: RaceConfig, setups: ParticipantSetup[], track?: TrackDefinition) {
     this.difficulty = DIFFICULTIES[config.difficulty];
@@ -292,6 +294,7 @@ export class RaceEngine {
     this.rules.tick(this, dt);
     if (s.sinceFirstFinish !== null) s.sinceFirstFinish += dt;
     this.updatePlaces();
+    this.onStep?.();
     if (this.rules.shouldEnd(this)) this.finishRace();
   }
 
