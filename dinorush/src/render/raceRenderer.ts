@@ -71,7 +71,7 @@ export class RaceRenderer {
     this.sun = lights.sun;
     if (this.shadows) {
       this.sun.castShadow = true;
-      this.sun.shadow.mapSize.set(2048, 2048);
+      this.sun.shadow.mapSize.set(1024, 1024);
       const sc = this.sun.shadow.camera;
       sc.left = -26;
       sc.right = 26;

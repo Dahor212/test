@@ -173,7 +173,8 @@ async function main() {
       await p1.waitForFunction(() => window.__race && window.__race.engine.state.phase === 'racing', null, { timeout: 20000 });
       const info = await p1.evaluate(() => window.__race.engine.state.participants.map((p) => p.kind));
       assert(info.filter((k) => k === 'ai').length === 2 && info.filter((k) => k === 'human').length === 1, 'participants ' + info);
-      await p1.waitForTimeout(1500);
+      // wait for 2 s of simulated race time (independent of how fast the test machine renders)
+      await p1.waitForFunction(() => window.__race.engine.state.time > 2, null, { timeout: 30000 });
       const pos = await p1.evaluate(() => window.__race.engine.state.participants.map((p) => p.position));
       assert(pos.every((x) => x > 5), 'racers are moving automatically ' + pos);
       await p1.screenshot({ path: join(OUT, 't02-race.png') });
