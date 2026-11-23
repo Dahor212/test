@@ -38,6 +38,8 @@ export interface ParticipantSetup {
   aiProfile?: AIProfileId;
   loadout: Record<Archetype, ParticipantLoadout>;
   start?: Archetype;
+  /** Visual lane (0..2); defaults to the index in the setup list. */
+  lane?: number;
 }
 
 function zeroRecord(): Record<Archetype, number> {
@@ -113,7 +115,7 @@ export class RaceEngine {
     const start = s.start ?? 'raptor';
     return {
       id: s.id,
-      lane,
+      lane: s.lane ?? lane,
       name: s.name,
       color: s.color,
       kind: s.kind,

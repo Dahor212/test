@@ -1,0 +1,255 @@
+import { ARCHETYPES, ARCHETYPE_INFO, DINOSAURS, DINO_BY_ID } from '../../config/dinosaurs';
+import { DIFFICULTY_LIST, PLAYER_COLORS } from '../../config/difficulty';
+import { MODE_LIST, MODES } from '../../config/modes';
+import { WORLD_LIST } from '../../config/worlds';
+import { store, useApp, type SetupStep } from '../../state/store';
+import type { Archetype, DifficultyId, WorldId } from '../../types';
+import { Button, DinoIcon, DinoThumb, Icon, TopBar } from '../components/common';
+import { useState } from 'react';
+
+const STEPS: SetupStep[] = ['mode', 'players', 'world', 'difficulty', 'lineup'];
+const TITLES: Record<SetupStep, string> = {
+  mode: 'Vyber hru',
+  players: 'Kolik vás hraje?',
+  world: 'Vyber svět',
+  difficulty: 'Jak těžké?',
+  lineup: 'Tvoji dinosauři',
+};
+
+export function SetupScreen() {
+  const step = useApp((s) => s.setupStep);
+  const idx = STEPS.indexOf(step);
+  const back = () => (idx === 0 ? store.go('MENU') : store.set({ setupStep: STEPS[idx - 1] }));
+  const next = () => store.set({ setupStep: STEPS[Math.min(STEPS.length - 1, idx + 1)] });
+  return (
+    <div className="screen setup-screen" data-testid={`setup-${step}`}>
+      <TopBar
+        title={TITLES[step]}
+        onBack={back}
+        right={
+          <div className="steps">
+            {STEPS.map((s, i) => (
+              <span key={s} className={'step-dot' + (i <= idx ? ' on' : '')} />
+            ))}
+          </div>
+        }
+      />
+      <div className="setup-body">
+        {step === 'mode' && <ModeStep onNext={next} />}
+        {step === 'players' && <PlayersStep onNext={next} />}
+        {step === 'world' && <WorldStep onNext={next} />}
+        {step === 'difficulty' && <DifficultyStep onNext={next} />}
+        {step === 'lineup' && <LineupStep />}
+      </div>
+    </div>
+  );
+}
+
+function ModeStep({ onNext }: { onNext: () => void }) {
+  const mode = useApp((s) => s.setup.mode);
+  return (
+    <div className="card-grid cols-3">
+      {MODE_LIST.map((m) => (
+        <button
+          type="button"
+          key={m.id}
+          data-testid={`mode-${m.id}`}
+          className={'choice-card mode-card' + (mode === m.id ? ' selected' : '')}
+          style={{ background: `linear-gradient(135deg, ${m.colors[0]}, ${m.colors[1]})` }}
+          onClick={() => {
+            store.updateSetup({ mode: m.id });
+            onNext();
+          }}
+        >
+          <Icon name={m.icon} size={64} className="card-icon" />
+          <span className="card-title">{m.name}</span>
+          <span className="card-desc">{m.description}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PlayersStep({ onNext }: { onNext: () => void }) {
+  const setup = useApp((s) => s.setup);
+  const team = setup.mode === 'team';
+  const opts: { n: 1 | 2 | 3; label: string; sub: string }[] = [
+    { n: 1, label: '1 hráč', sub: team ? '+ 2 počítačoví kamarádi' : '+ 2 počítačoví soupeři' },
+    { n: 2, label: '2 hráči', sub: team ? '+ 1 počítačový kamarád' : '+ 1 počítačový soupeř' },
+    { n: 3, label: '3 hráči', sub: 'Všichni na jednom tabletu' },
+  ];
+  return (
+    <div className="players-step">
+      <div className="card-grid cols-3">
+        {opts.map((o) => (
+          <button
+            type="button"
+            key={o.n}
+            data-testid={`players-${o.n}`}
+            className={'choice-card players-card' + (setup.humans === o.n ? ' selected' : '')}
+            onClick={() => store.updateSetup({ humans: o.n })}
+          >
+            <div className="player-figures">
+              {[0, 1, 2].map((i) => (
+                <span key={i} className={'fig' + (i < o.n ? ' human' : ' ai')} style={{ background: i < o.n ? PLAYER_COLORS[i] : '#b2bec3' }}>
+                  <Icon name={i < o.n ? 'star' : 'gear'} size={26} />
+                </span>
+              ))}
+            </div>
+            <span className="card-title">{o.label}</span>
+            <span className="card-desc">{o.sub}</span>
+          </button>
+        ))}
+      </div>
+      <div className="names-row">
+        {Array.from({ length: setup.humans }, (_, i) => (
+          <label key={i} className="name-input" style={{ borderColor: PLAYER_COLORS[i] }}>
+            <span className="name-dot" style={{ background: PLAYER_COLORS[i] }} />
+            <input
+              data-testid={`name-${i}`}
+              value={setup.names[i] ?? ''}
+              maxLength={14}
+              placeholder={`Hráč ${i + 1}`}
+              onChange={(e) => {
+                const names = [...setup.names];
+                names[i] = e.target.value;
+                store.updateSetup({ names });
+              }}
+            />
+          </label>
+        ))}
+      </div>
+      {setup.humans > 1 && setup.mode !== 'team' && <p className="fair-note"><Icon name="heart" size={22} /> Všichni mají stejně silné dinosaury – rozhoduje postřeh!</p>}
+      <Button color="green" size="lg" icon="play" onClick={onNext} testId="players-next">
+        Dál
+      </Button>
+    </div>
+  );
+}
+
+function WorldArt({ id }: { id: WorldId }) {
+  const art: Record<WorldId, string> = {
+    jungle: `<svg viewBox="0 0 200 120"><circle cx="165" cy="25" r="16" fill="#fff36b"/><path d="M0 100 Q50 60 100 90 T200 80 V120 H0Z" fill="#2f8a4a"/><path d="M0 110 Q60 80 120 105 T200 100 V120 H0Z" fill="#46c35a"/><rect x="40" y="45" width="7" height="50" fill="#8a5a2b"/><ellipse cx="44" cy="45" rx="26" ry="9" fill="#2e9e44"/><ellipse cx="44" cy="40" rx="16" ry="8" fill="#46c35a"/><path d="M120 112 Q150 98 200 108" stroke="#2ec4f0" stroke-width="8" fill="none"/></svg>`,
+    volcano: `<svg viewBox="0 0 200 120"><path d="M50 110 L100 30 L120 30 L170 110Z" fill="#3a2a28"/><path d="M100 30 L120 30 L114 46 L106 42Z" fill="#ff5a1a"/><circle cx="110" cy="18" r="9" fill="#9a9a9a" opacity="0.8"/><circle cx="122" cy="8" r="7" fill="#b0b0b0" opacity="0.7"/><path d="M0 110 H200 V120 H0Z" fill="#2a2322"/><path d="M20 112 Q40 104 60 112" stroke="#ff9a1a" stroke-width="5" fill="none"/><rect x="130" y="100" width="50" height="6" fill="#a0632e"/></svg>`,
+    ice: `<svg viewBox="0 0 200 120"><path d="M20 110 L60 40 L100 110Z" fill="#dcefff"/><path d="M50 58 L60 40 L70 58 Z" fill="#fff"/><path d="M90 110 L140 25 L190 110Z" fill="#bfe0f5"/><path d="M128 46 L140 25 L152 46Z" fill="#fff"/><path d="M0 108 H200 V120 H0Z" fill="#fff"/><g stroke="#fff" stroke-width="3"><path d="M30 20 V36 M22 28 H38 M24 22 L36 34 M36 22 L24 34"/></g></svg>`,
+    islands: `<svg viewBox="0 0 200 120"><circle cx="40" cy="25" r="15" fill="#fff36b"/><path d="M0 85 H200 V120 H0Z" fill="#1fc8db"/><ellipse cx="120" cy="88" rx="60" ry="14" fill="#f6e27f"/><path d="M120 85 Q118 60 126 42" stroke="#b07a3c" stroke-width="6" fill="none"/><ellipse cx="128" cy="42" rx="24" ry="6" fill="#4fd06a" transform="rotate(-15 128 42)"/><ellipse cx="124" cy="42" rx="22" ry="6" fill="#2fae52" transform="rotate(25 124 42)"/><path d="M10 100 Q20 95 30 100 M160 105 Q170 100 180 105" stroke="#fff" stroke-width="3" fill="none"/></svg>`,
+  };
+  return <span className="world-art" dangerouslySetInnerHTML={{ __html: art[id] }} />;
+}
+
+function WorldStep({ onNext }: { onNext: () => void }) {
+  const world = useApp((s) => s.setup.worldId);
+  const mode = useApp((s) => s.setup.mode);
+  return (
+    <div className="card-grid cols-2 worlds">
+      {WORLD_LIST.map((w) => (
+        <button
+          type="button"
+          key={w.id}
+          data-testid={`world-${w.id}`}
+          className={'choice-card world-card' + (world === w.id ? ' selected' : '')}
+          style={{ background: `linear-gradient(160deg, ${w.cardColors[0]}, ${w.cardColors[1]})` }}
+          onClick={() => {
+            store.updateSetup({ worldId: w.id });
+            onNext();
+          }}
+        >
+          <WorldArt id={w.id} />
+          <span className="card-title">{w.name}</span>
+          <span className="card-desc">{mode === 'cup' ? 'První závod poháru' : w.subtitle}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function DifficultyStep({ onNext }: { onNext: () => void }) {
+  const d = useApp((s) => s.setup.difficulty);
+  const sizes: Record<DifficultyId, number> = { small: 90, racer: 125, champion: 160 };
+  const colors: Record<DifficultyId, [string, string]> = {
+    small: ['#7bed9f', '#2ed573'],
+    racer: ['#70a1ff', '#1e90ff'],
+    champion: ['#ff7f50', '#ff4757'],
+  };
+  return (
+    <div className="card-grid cols-3">
+      {DIFFICULTY_LIST.map((x) => (
+        <button
+          type="button"
+          key={x.id}
+          data-testid={`difficulty-${x.id}`}
+          className={'choice-card diff-card' + (d === x.id ? ' selected' : '')}
+          style={{ background: `linear-gradient(160deg, ${colors[x.id][0]}, ${colors[x.id][1]})` }}
+          onClick={() => {
+            store.updateSetup({ difficulty: x.id });
+            onNext();
+          }}
+        >
+          <DinoIcon archetype="raptor" size={sizes[x.id]} />
+          <span className="card-title">{x.name}</span>
+          <span className="card-age">{x.ages}</span>
+          <span className="card-desc">
+            <Icon name="warning" size={18} /> upozornění {x.warningTime} s
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function LineupStep() {
+  const setup = useApp((s) => s.setup);
+  const profile = useApp((s) => s.profile);
+  const [seat, setSeat] = useState(0);
+  const lineup = profile.players[seat].lineup;
+  const cycle = (a: Archetype, dir: number) => {
+    const owned = DINOSAURS.filter((d) => d.archetype === a && profile.dinos[d.id]);
+    const i = owned.findIndex((d) => d.id === lineup[a]);
+    const nextDef = owned[(i + dir + owned.length) % owned.length];
+    store.updateProfile((p) => {
+      p.players[seat].lineup[a] = nextDef.id;
+    });
+  };
+  return (
+    <div className="lineup-step">
+      {setup.humans > 1 && (
+        <div className="seat-tabs">
+          {Array.from({ length: setup.humans }, (_, i) => (
+            <button type="button" key={i} className={'seat-tab' + (i === seat ? ' on' : '')} style={{ ['--pc' as string]: PLAYER_COLORS[i] }} onClick={() => setSeat(i)}>
+              {setup.names[i] || `Hráč ${i + 1}`}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="lineup-slots">
+        {ARCHETYPES.map((a) => {
+          const def = DINO_BY_ID[lineup[a]];
+          const owned = DINOSAURS.filter((d) => d.archetype === a && profile.dinos[d.id]).length;
+          const inst = profile.dinos[def.id];
+          return (
+            <div key={a} className="lineup-slot" style={{ ['--dc' as string]: ARCHETYPE_INFO[a].color }} data-testid={`slot-${a}`}>
+              <span className="slot-role">{ARCHETYPE_INFO[a].role}</span>
+              <DinoThumb defId={def.id} accessory={inst?.accessory ?? null} size={170} />
+              <span className="slot-name">{def.name}</span>
+              <span className="slot-level">Úroveň {inst?.level ?? 1}</span>
+              {owned > 1 ? (
+                <div className="slot-arrows">
+                  <Button color="white" size="sm" icon="back" onClick={() => cycle(a, -1)} />
+                  <Button color="white" size="sm" icon="back" className="flip" onClick={() => cycle(a, 1)} />
+                </div>
+              ) : (
+                <span className="slot-hint">Další z vajíček</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <p className="lineup-note">
+        <Icon name="dinos" size={24} /> Sestava má vždy rychlíka, plavce, bouráka i tereňáka.
+      </p>
+      <Button color="orange" size="xl" icon="flag" onClick={() => store.startRace()} testId="start-race" className="go-btn">
+        {MODES[setup.mode].id === 'cup' ? 'START POHÁRU!' : 'ZÁVOD!'}
+      </Button>
+    </div>
+  );
+}

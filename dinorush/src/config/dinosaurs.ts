@@ -5,19 +5,21 @@ export const ARCHETYPES: Archetype[] = ['raptor', 'spino', 'ankylo', 'trike'];
 export interface ArchetypeInfo {
   id: Archetype;
   species: string;
+  /** Czech accusative ("Klepni na …"). */
+  accusative: string;
   role: string;
   /** UI colour (CSS). */
   color: string;
   colorDark: string;
   ability: AbilityId;
   specialty: string;
-  /** Keyboard shortcuts per seat. */
 }
 
 export const ARCHETYPE_INFO: Record<Archetype, ArchetypeInfo> = {
   raptor: {
     id: 'raptor',
     species: 'Velociraptor',
+    accusative: 'Velociraptora',
     role: 'RYCHLÍK',
     color: '#4cd137',
     colorDark: '#2a8a1c',
@@ -27,6 +29,7 @@ export const ARCHETYPE_INFO: Record<Archetype, ArchetypeInfo> = {
   spino: {
     id: 'spino',
     species: 'Spinosaurus',
+    accusative: 'Spinosaura',
     role: 'PLAVEC',
     color: '#2e86ff',
     colorDark: '#1a4fa8',
@@ -36,6 +39,7 @@ export const ARCHETYPE_INFO: Record<Archetype, ArchetypeInfo> = {
   ankylo: {
     id: 'ankylo',
     species: 'Ankylosaurus',
+    accusative: 'Ankylosaura',
     role: 'BOURÁK',
     color: '#ff8c1a',
     colorDark: '#b35800',
@@ -45,6 +49,7 @@ export const ARCHETYPE_INFO: Record<Archetype, ArchetypeInfo> = {
   trike: {
     id: 'trike',
     species: 'Triceratops',
+    accusative: 'Triceratopse',
     role: 'TEREŇÁK',
     color: '#a55eea',
     colorDark: '#6b2fae',
