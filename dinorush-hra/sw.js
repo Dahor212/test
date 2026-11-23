@@ -1,8 +1,8 @@
 /* DinoRUSH service worker – generated at build time */
-const CACHE = 'dinorush-mwsyog9k';
+const CACHE = 'dinorush-mwt1yhtl';
 const PRECACHE = [
   "./",
-  "./assets/index-Ci8oSkaU.js",
+  "./assets/index-CnUk9Tjr.js",
   "./assets/index-CBpBdxXK.css",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
