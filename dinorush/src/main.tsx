@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import './styles/app.css';
+import './styles/screens.css';
 import { App } from './ui/App';
 import { store } from './state/store';
 import { generateTrack } from './game/trackGenerator';

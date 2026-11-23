@@ -8,6 +8,28 @@ import { profileName } from '../../progression/profile';
 import { store, useApp } from '../../state/store';
 import { Button, CoinCounter, Icon, Modal, ProfileAvatar } from '../components/common';
 
+function DockTile({ icon, label, color, onClick, testId, badge = 0 }: { icon: string; label: string; color: string; onClick: () => void; testId: string; badge?: number }) {
+  return (
+    <button
+      type="button"
+      className={'dock-tile' + (badge > 0 ? ' has-badge' : '')}
+      data-testid={testId}
+      style={{ ['--tc' as string]: color }}
+      onClick={() => {
+        sound.unlock();
+        sound.play('tap');
+        onClick();
+      }}
+    >
+      <span className="dock-icon">
+        <Icon name={icon} size={30} />
+      </span>
+      <span className="dock-label">{label}</span>
+      {badge > 0 && <b className="badge">{badge}</b>}
+    </button>
+  );
+}
+
 export function MainMenu() {
   const profile = useApp((s) => s.profile);
   const quality = useApp((s) => s.settings.quality);
@@ -106,22 +128,12 @@ export function MainMenu() {
           </Button>
         )}
       </div>
-      <nav className="menu-grid">
-        <Button color="blue" size="lg" icon="book" onClick={() => store.go('COLLECTION')} testId="nav-collection">
-          Dino sbírka
-        </Button>
-        <Button color="green" size="lg" icon="park" onClick={() => store.go('DINO_PARK')} testId="nav-park">
-          Dino Park
-        </Button>
-        <Button color="purple" size="lg" icon="list" onClick={() => store.go('MISSIONS')} testId="nav-missions">
-          Úkoly
-        </Button>
-        <Button color="yellow" size="lg" icon="egg" onClick={() => store.go('EGG_HATCHING')} testId="nav-eggs" className={eggs > 0 ? 'has-badge' : ''}>
-          Vajíčka{eggs > 0 && <b className="badge">{eggs}</b>}
-        </Button>
-        <Button color="white" size="lg" icon="gear" onClick={() => store.go('SETTINGS')} testId="nav-settings">
-          Nastavení
-        </Button>
+      <nav className="menu-dock">
+        <DockTile icon="book" label="Dino sbírka" color="var(--blue)" onClick={() => store.go('COLLECTION')} testId="nav-collection" />
+        <DockTile icon="park" label="Dino Park" color="var(--green)" onClick={() => store.go('DINO_PARK')} testId="nav-park" />
+        <DockTile icon="list" label="Úkoly" color="var(--purple)" onClick={() => store.go('MISSIONS')} testId="nav-missions" />
+        <DockTile icon="egg" label="Vajíčka" color="var(--orange)" onClick={() => store.go('EGG_HATCHING')} testId="nav-eggs" badge={eggs} />
+        <DockTile icon="gear" label="Nastavení" color="#7f8fa6" onClick={() => store.go('SETTINGS')} testId="nav-settings" />
       </nav>
       {showOffer && (
         <Modal>

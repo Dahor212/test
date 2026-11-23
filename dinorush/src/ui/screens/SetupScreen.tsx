@@ -10,6 +10,13 @@ import { Button, DinoIcon, DinoThumb, Icon, ProfileAvatar, TopBar } from '../com
 import { useState } from 'react';
 
 const STEPS: SetupStep[] = ['mode', 'players', 'world', 'difficulty', 'lineup'];
+const STEP_LABELS: Record<SetupStep, string> = {
+  mode: 'Hra',
+  players: 'Hráči',
+  world: 'Svět',
+  difficulty: 'Obtížnost',
+  lineup: 'Dinosauři',
+};
 const TITLES: Record<SetupStep, string> = {
   mode: 'Vyber hru',
   players: 'Kolik vás hraje?',
@@ -28,12 +35,18 @@ export function SetupScreen() {
       <TopBar
         title={TITLES[step]}
         onBack={back}
+        icon="play"
         right={
-          <div className="steps">
+          <ol className="stepper">
             {STEPS.map((s, i) => (
-              <span key={s} className={'step-dot' + (i <= idx ? ' on' : '')} />
+              <li key={s} className={i < idx ? 'done' : i === idx ? 'on' : ''}>
+                <button type="button" disabled={i >= idx} onClick={() => store.set({ setupStep: s })}>
+                  <span className="st-num">{i < idx ? <Icon name="check" size={16} /> : i + 1}</span>
+                  <span className="st-label">{STEP_LABELS[s]}</span>
+                </button>
+              </li>
             ))}
-          </div>
+          </ol>
         }
       />
       <div className="setup-body">
@@ -57,15 +70,19 @@ function ModeStep({ onNext }: { onNext: () => void }) {
           key={m.id}
           data-testid={`mode-${m.id}`}
           className={'choice-card mode-card' + (mode === m.id ? ' selected' : '')}
-          style={{ background: `linear-gradient(135deg, ${m.colors[0]}, ${m.colors[1]})` }}
+          style={{ ['--c1' as string]: m.colors[0], ['--c2' as string]: m.colors[1] }}
           onClick={() => {
             store.updateSetup({ mode: m.id });
             onNext();
           }}
         >
-          <Icon name={m.icon} size={64} className="card-icon" />
-          <span className="card-title">{m.name}</span>
-          <span className="card-desc">{m.description}</span>
+          <span className="cc-art">
+            <Icon name={m.icon} size={96} className="card-icon" />
+          </span>
+          <span className="cc-body">
+            <span className="card-title">{m.name}</span>
+            <span className="card-desc">{m.description}</span>
+          </span>
         </button>
       ))}
     </div>
@@ -91,8 +108,10 @@ function PlayersStep({ onNext }: { onNext: () => void }) {
               key={o.n}
               data-testid={`players-${o.n}`}
               className={'choice-card players-card' + (setup.humans === o.n ? ' selected' : '')}
+              style={{ ['--c1' as string]: '#74b9ff', ['--c2' as string]: '#1e90ff' }}
               onClick={() => store.updateSetup({ humans: o.n })}
             >
+              <span className="cc-art">
               <div className="player-figures">
                 {laneLayout(o.n).map((kind, i) => {
                   const human = kind === 'h';
@@ -104,21 +123,34 @@ function PlayersStep({ onNext }: { onNext: () => void }) {
                   );
                 })}
               </div>
-              <span className="card-title">{o.label}</span>
-              <span className="card-desc">{o.sub}</span>
+              </span>
+              <span className="cc-body">
+                <span className="card-title">{o.label}</span>
+                <span className="card-desc">{o.sub}</span>
+              </span>
             </button>
           );
         })}
       </div>
-      <div className="names-row">
-        {Array.from({ length: setup.humans }, (_, i) => (
-          <SeatRow key={i} seat={i} />
-        ))}
+      <div className="setup-panel">
+        <div className="names-row">
+          {Array.from({ length: setup.humans }, (_, i) => (
+            <SeatRow key={i} seat={i} />
+          ))}
+        </div>
+        <div className="setup-panel-foot">
+          {setup.humans > 1 && setup.mode !== 'team' ? (
+            <p className="fair-note">
+              <Icon name="heart" size={22} /> Všichni mají stejně silné dinosaury – rozhoduje postřeh!
+            </p>
+          ) : (
+            <span />
+          )}
+          <Button color="green" size="lg" icon="next" onClick={onNext} testId="players-next">
+            Dál
+          </Button>
+        </div>
       </div>
-      {setup.humans > 1 && setup.mode !== 'team' && <p className="fair-note"><Icon name="heart" size={22} /> Všichni mají stejně silné dinosaury – rozhoduje postřeh!</p>}
-      <Button color="green" size="lg" icon="play" onClick={onNext} testId="players-next">
-        Dál
-      </Button>
     </div>
   );
 }
@@ -189,7 +221,7 @@ export function WorldArt({ id, className = 'world-art' }: { id: WorldId; classNa
     islands: `<svg viewBox="0 0 200 120"><circle cx="40" cy="25" r="15" fill="#fff36b"/><path d="M0 85 H200 V120 H0Z" fill="#1fc8db"/><ellipse cx="120" cy="88" rx="60" ry="14" fill="#f6e27f"/><path d="M120 85 Q118 60 126 42" stroke="#b07a3c" stroke-width="6" fill="none"/><ellipse cx="128" cy="42" rx="24" ry="6" fill="#4fd06a" transform="rotate(-15 128 42)"/><ellipse cx="124" cy="42" rx="22" ry="6" fill="#2fae52" transform="rotate(25 124 42)"/><path d="M10 100 Q20 95 30 100 M160 105 Q170 100 180 105" stroke="#fff" stroke-width="3" fill="none"/></svg>`,
   };
   // as a backdrop the art covers the whole area
-  const svg = className === 'map-art' ? art[id].replace('<svg ', '<svg preserveAspectRatio="xMidYMax slice" ') : art[id];
+  const svg = className === 'world-art' ? art[id] : art[id].replace('<svg ', '<svg preserveAspectRatio="xMidYMax slice" ');
   return <span className={className} dangerouslySetInnerHTML={{ __html: svg }} />;
 }
 
@@ -204,15 +236,19 @@ function WorldStep({ onNext }: { onNext: () => void }) {
           key={w.id}
           data-testid={`world-${w.id}`}
           className={'choice-card world-card' + (world === w.id ? ' selected' : '')}
-          style={{ background: `linear-gradient(160deg, ${w.cardColors[0]}, ${w.cardColors[1]})` }}
+          style={{ ['--c1' as string]: w.cardColors[0], ['--c2' as string]: w.cardColors[1] }}
           onClick={() => {
             store.updateSetup({ worldId: w.id });
             onNext();
           }}
         >
-          <WorldArt id={w.id} />
-          <span className="card-title">{w.name}</span>
-          <span className="card-desc">{mode === 'cup' ? 'První závod poháru' : w.subtitle}</span>
+          <span className="cc-art">
+            <WorldArt id={w.id} className="cc-world-art" />
+          </span>
+          <span className="cc-body">
+            <span className="card-title">{w.name}</span>
+            <span className="card-desc">{mode === 'cup' ? 'První závod poháru' : w.subtitle}</span>
+          </span>
         </button>
       ))}
     </div>
@@ -221,7 +257,7 @@ function WorldStep({ onNext }: { onNext: () => void }) {
 
 function DifficultyStep({ onNext }: { onNext: () => void }) {
   const d = useApp((s) => s.setup.difficulty);
-  const sizes: Record<DifficultyId, number> = { small: 90, racer: 125, champion: 160 };
+  const sizes: Record<DifficultyId, number> = { small: 120, racer: 160, champion: 200 };
   const colors: Record<DifficultyId, [string, string]> = {
     small: ['#7bed9f', '#2ed573'],
     racer: ['#70a1ff', '#1e90ff'],
@@ -235,17 +271,19 @@ function DifficultyStep({ onNext }: { onNext: () => void }) {
           key={x.id}
           data-testid={`difficulty-${x.id}`}
           className={'choice-card diff-card' + (d === x.id ? ' selected' : '')}
-          style={{ background: `linear-gradient(160deg, ${colors[x.id][0]}, ${colors[x.id][1]})` }}
+          style={{ ['--c1' as string]: colors[x.id][0], ['--c2' as string]: colors[x.id][1] }}
           onClick={() => {
             store.updateSetup({ difficulty: x.id });
             onNext();
           }}
         >
-          <DinoIcon archetype="raptor" size={sizes[x.id]} />
-          <span className="card-title">{x.name}</span>
-          <span className="card-age">{x.ages}</span>
-          <span className="card-desc">
-            <Icon name="warning" size={18} /> upozornění {x.warningTime} s
+          <span className="cc-art">
+            <DinoIcon archetype="raptor" size={sizes[x.id]} />
+          </span>
+          <span className="cc-body">
+            <span className="card-title">{x.name}</span>
+            <span className="card-age">{x.ages}</span>
+            <span className="card-desc">Nápověda {x.warningTime} s před změnou terénu</span>
           </span>
         </button>
       ))}

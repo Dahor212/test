@@ -146,7 +146,8 @@ dinorush/
 │  │  ├─ race/RaceScreen.tsx       # 3D + HUD + ovládací panely 1–3 hráčů (Pointer Events)
 │  │  └─ screens/                  # profily, menu, mapa dobrodružství, denní výzva, nastavení závodu, výsledky,
 │  │                               #   pohár, sbírka, vajíčka, park, úkoly, nastavení
-│  └─ styles/app.css
+│  └─ styles/                      # app.css (základ, závodní HUD, animace), screens.css (jednotný vzhled
+│                                  #   všech menu obrazovek: nebe s kopci, bílé panely, karty s obrázkem)
 ├─ tests/                          # Vitest – generátor, engine, AI, režimy, ekonomika, ukládání, kampaň, duch, profily
 └─ e2e/run-e2e.mjs                 # Playwright – 25 scénářů včetně multi-touch, offline PWA, dobrodružství a profilů
 ```
@@ -193,6 +194,8 @@ dinorush/
 - **Denní výzva**: každý den jedna nová trať (střídají se světy i režimy), stejná pro všechny. Za první dokončení dne +50 mincí, za 3 hvězdy +30. **Rodinná tabulka** ukazuje dnešní nejlepší výsledky všech profilů. Žádné série: vynechaný den nic nebere.
 - **Duch vlastního rekordu**: hra zaznamená tvoji nejlepší jízdu na úrovni dobrodružství a v denní výzvě (a i u „HRÁT ZNOVU“ na stejné trati). Při dalším pokusu běží vedle tebe průsvitný dinosaurus „Duch“, na ukazateli postupu je jeho značka a v panelu odstup v metrech. Ve výsledcích se ukáže, o kolik sekund jsi ducha porazil(a).
 - 4 nové úkoly: Hvězdný dobrodruh, Krotitel T-Rexe, Denní závodník, Rychlejší než duch.
+
+**Vzhled menu**: všechny obrazovky mimo závod sdílejí jeden designový systém: stejné pozadí (nebe, mraky a kopce), bílé zaoblené panely, stejné záhlaví (tlačítko zpět, ikona, nadpis, mince), karty s barevným obrázkem nahoře a textem dole, krokový ukazatel při nastavení závodu a spodní lištu s ikonami v hlavním menu.
 
 **Ostatní**: interaktivní tutoriál na skutečné trati (zpomalení, zvýraznění tlačítka, lze přeskočit). Syntetizované zvuky (~22 efektů) a hudba, startují až po dotyku. Nastavení (hlasitost, hudba, efekty, omezení animací, kvalita grafiky, výchozí obtížnost, znovu tutoriál, smazání postupu s dvojitým potvrzením). Verzované ukládání s migrací, validací a zálohou poškozených dat. Pauza při přechodu na pozadí. Výzva k otočení na šířku. PWA instalace a offline režim. Podpora klávesnice na PC (hráč 1: `1–4` / `A S D F`, hráč 2: `Q W E R`, hráč 3: `U I O P`, pauza `Esc` / mezerník).
 

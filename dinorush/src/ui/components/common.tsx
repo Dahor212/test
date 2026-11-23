@@ -92,10 +92,14 @@ export function TopBar({ title, onBack, right, icon }: { title: string; onBack?:
   return (
     <header className="topbar">
       <Button color="white" size="sm" icon="back" onClick={onBack ?? (() => store.go('MENU'))} className="back-btn" testId="back" />
-      <h1>
-        {icon && <Icon name={icon} size={34} />}
-        {title}
-      </h1>
+      <div className="topbar-title">
+        {icon && (
+          <span className="topbar-icon">
+            <Icon name={icon} size={30} />
+          </span>
+        )}
+        <h1>{title}</h1>
+      </div>
       <div className="topbar-right">{right ?? <CoinCounter />}</div>
     </header>
   );

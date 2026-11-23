@@ -37,17 +37,23 @@ export function DailyScreen() {
     <div className="screen daily-screen" data-testid="daily">
       <TopBar title={`Denní výzva · ${DAYS[now.getDay()]} ${now.getDate()}. ${now.getMonth() + 1}.`} icon="calendar" />
       <div className="daily-body">
-        <section className="daily-card" style={{ background: `linear-gradient(160deg, ${world.cardColors[0]}, ${world.cardColors[1]})` }}>
-          <div className="dc-head">
-            <Icon name={mode.icon} size={54} />
-            <div>
-              <h2>{mode.name}</h2>
-              <span>
-                {world.name} · {DIFFICULTIES[profile.campaign.difficulty].name}
+        <section className="daily-card">
+          <div className="dc-hero" style={{ background: `linear-gradient(160deg, ${world.cardColors[0]}, ${world.cardColors[1]})` }}>
+            <WorldArt id={spec.worldId} className="dc-art" />
+            <div className="dc-head">
+              <span className="dc-mode">
+                <Icon name={mode.icon} size={40} />
               </span>
+              <div>
+                <h2>{mode.name}</h2>
+                <span>
+                  {world.name} · {DIFFICULTIES[profile.campaign.difficulty].name}
+                </span>
+              </div>
+              <Stars count={mine?.stars ?? 0} size={32} />
             </div>
-            <Stars count={mine?.stars ?? 0} size={34} />
           </div>
+          <div className="dc-content">
           <GoalList goals={spec.goals} text={goalText} icon={goalIcon} />
           <div className="dc-info">
             {mine?.best !== null && mine?.best !== undefined && (
@@ -65,10 +71,10 @@ export function DailyScreen() {
               {mine?.rewarded ? 'Dnešní odměna je tvoje' : `Za dokončení +${DAILY_REWARDS.complete}, za 3 hvězdy +${DAILY_REWARDS.threeStars}`}
             </span>
           </div>
-          <WorldArt id={spec.worldId} className="dc-art" />
-          <Button color="orange" size="xl" icon="play" onClick={() => store.startDaily()} testId="start-daily" className="dc-play">
+          <Button color="orange" size="lg" icon="play" onClick={() => store.startDaily()} testId="start-daily" className="dc-play">
             Závodit!
           </Button>
+          </div>
         </section>
         <section className="daily-side">
           <h3>

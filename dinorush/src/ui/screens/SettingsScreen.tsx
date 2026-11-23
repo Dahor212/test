@@ -29,6 +29,8 @@ export function SettingsScreen() {
     <div className="screen settings-screen" data-testid="settings">
       <TopBar title="Nastavení" icon="gear" />
       <div className="settings-body">
+        <section className="settings-group">
+        <h3>Zvuk</h3>
         <div className="setting-row">
           <Icon name="sound" size={34} />
           <span>Hlasitost</span>
@@ -56,6 +58,24 @@ export function SettingsScreen() {
           <span>Zvukové efekty</span>
           <Toggle on={s.sfx} onChange={(v) => store.updateSettings({ sfx: v })} testId="toggle-sfx" />
         </div>
+        <h3>Hráč</h3>
+        <div className="setting-row">
+          <Icon name="user" size={34} />
+          <span>Profily hráčů</span>
+          <Button color="blue" size="sm" onClick={() => store.go('PROFILES')} testId="to-profiles">
+            Kdo hraje?
+          </Button>
+        </div>
+        <div className="setting-row danger">
+          <Icon name="trash" size={34} />
+          <span>Smazat postup hráče {profileName}</span>
+          <Button color="red" size="sm" onClick={() => setConfirm(1)} testId="reset">
+            Začít od nuly
+          </Button>
+        </div>
+        </section>
+        <section className="settings-group">
+        <h3>Hra</h3>
         <div className="setting-row">
           <Icon name="star" size={34} />
           <span>Omezit animace</span>
@@ -84,13 +104,7 @@ export function SettingsScreen() {
             Spustit znovu
           </Button>
         </div>
-        <div className="setting-row danger">
-          <Icon name="trash" size={34} />
-          <span>Smazat postup hráče {profileName}</span>
-          <Button color="red" size="sm" onClick={() => setConfirm(1)} testId="reset">
-            Začít od nuly
-          </Button>
-        </div>
+        </section>
         <p className="about">DinoRUSH – Závod evoluce · verze 0.2 · funguje i bez internetu</p>
       </div>
       {confirm > 0 && (

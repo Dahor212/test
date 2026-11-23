@@ -32,6 +32,8 @@ function mainValue(r: ParticipantResult, ranking: string): string {
   return formatTime(r.finishTime);
 }
 
+const PLACE_TEXT = ['Vítězství!', 'Skvělé 2. místo!', 'Na stupních vítězů!', 'Dobrá jízda!', 'Příště to bude lepší!'];
+
 /** Dino the racer used the most (shown on the podium). */
 function favouriteDino(r: ParticipantResult): string {
   const entries = Object.entries(r.used) as [keyof typeof r.used, number][];
@@ -58,6 +60,7 @@ export function ResultsScreen() {
   const dspec = daily ? dailySpec(daily.key) : null;
   const ghost = last.ghost;
   const compactPodium = !!(camp || daily);
+  const bestHuman = [...result.results].filter((r) => r.kind === 'human').sort((a, b) => a.place - b.place)[0];
   const title = last.tutorial
     ? 'Výborně! Umíš to!'
     : camp
@@ -74,9 +77,16 @@ export function ResultsScreen() {
 
   return (
     <div className="screen results-screen" data-testid="results">
-      <header className="results-head">
-        <h1>{title}</h1>
-        <CoinCounter big />
+      <header className="topbar results-head">
+        <div className="topbar-title">
+          <span className="topbar-icon">
+            <Icon name={camp ? 'map' : daily ? 'calendar' : last.tutorial ? 'star' : 'trophy'} size={30} />
+          </span>
+          <h1>{title}</h1>
+        </div>
+        <div className="topbar-right">
+          <CoinCounter />
+        </div>
       </header>
       <div className="results-body">
         <div className={'podium-wrap' + (compactPodium ? ' compact' : '')}>
@@ -113,6 +123,18 @@ export function ResultsScreen() {
                 <Stars count={daily.stars} size={42} />
               </div>
               <GoalList goals={dspec.goals} met={daily.met} text={goalText} icon={goalIcon} />
+            </div>
+          )}
+          {!compactPodium && mode.id !== 'team' && !last.tutorial && bestHuman && (
+            <div className="results-hero" data-testid="results-hero">
+              <span className={`rh-place p${bestHuman.place}`}>{bestHuman.place}.</span>
+              <span className="rh-text">
+                <b>{PLACE_TEXT[Math.min(bestHuman.place, 5) - 1]}</b>
+                <span>
+                  {result.results.filter((r) => r.kind === 'human').length > 1 ? `${bestHuman.name} · ` : ''}
+                  {mainValue(bestHuman, mode.ranking)}
+                </span>
+              </span>
             </div>
           )}
           {mode.id === 'team' && (

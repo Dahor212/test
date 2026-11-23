@@ -5,6 +5,16 @@ import { useApp } from '../../state/store';
 import type { DifficultyId, WorldId } from '../../types';
 import { formatTime, Icon, ProgressBar, TopBar } from '../components/common';
 
+function RecordTile({ icon, value, label }: { icon: string; value: number | string; label: string }) {
+  return (
+    <div className="record-tile">
+      <Icon name={icon} size={26} />
+      <b>{value}</b>
+      <small>{label}</small>
+    </div>
+  );
+}
+
 export function MissionsScreen() {
   const profile = useApp((s) => s.profile);
   const list = missionStatus(profile);
@@ -48,23 +58,16 @@ export function MissionsScreen() {
           <h2>
             <Icon name="trophy" size={28} /> Rekordy
           </h2>
-          <ul>
-            <li>
-              Závody: <b>{profile.stats.racesFinished}</b> · Výhry: <b>{profile.stats.wins}</b>
-            </li>
-            <li>
-              Nekonečná výprava: <b>{r.endlessBest}</b> bodů
-            </li>
-            <li>
-              Zlatá horečka: <b>{r.goldBest}</b> mincí
-            </li>
-            <li>
-              Náskok před T-Rexem: <b>{r.trexBestLead}</b> m
-            </li>
-            <li>
-              Nejdelší kombo: <b>{profile.stats.maxCombo}×</b> · Perfektní proměny: <b>{profile.stats.perfects}</b>
-            </li>
-          </ul>
+          <div className="record-tiles">
+            <RecordTile icon="flag" value={profile.stats.racesFinished} label="závodů" />
+            <RecordTile icon="trophy" value={profile.stats.wins} label="výher" />
+            <RecordTile icon="star" value={profile.stats.perfects} label="perfektních proměn" />
+            <RecordTile icon="combo" value={`${profile.stats.maxCombo}×`} label="nejdelší kombo" />
+            <RecordTile icon="infinity" value={r.endlessBest} label="bodů ve výpravě" />
+            <RecordTile icon="coin" value={r.goldBest} label="mincí v horečce" />
+            <RecordTile icon="trex" value={`${r.trexBestLead} m`} label="náskok před T-Rexem" />
+            <RecordTile icon="ghost" value={profile.stats.ghostsBeaten} label="poražených duchů" />
+          </div>
           <h3>Nejlepší časy</h3>
           <ul className="best-times">
             {Object.entries(r.bestTimes).length === 0 && <li className="muted">Zatím žádné</li>}
