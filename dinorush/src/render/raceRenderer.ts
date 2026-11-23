@@ -53,6 +53,9 @@ export class RaceRenderer {
   private shadows: boolean;
   private ghost: GhostVisual | null = null;
   private ghostLane = 2;
+  /** Smoothed running-surface height per racer (gorges). */
+  private groundY = new Map<string, number>();
+  private mistTimer = 0;
 
   constructor(container: HTMLElement, engine: RaceEngine, opts: RaceRendererOptions, ghost: GhostPlayer | null = null) {
     this.container = container;
@@ -275,6 +278,12 @@ export class RaceRenderer {
       // racers right in front of the camera (behind the followed player) would block the view
       rv.group.visible = p.kind === 'human' || p.position > this.anchor - 3;
       this.path.sample(p.position, racerLateral(this.path, p.lane, p.position), rv.group.position);
+      // walkers go down into a gorge, the flyer stays above it
+      const gy = p.current === 'ptero' ? 0 : this.field.trackY(p.position);
+      const prevY = this.groundY.get(p.id) ?? gy;
+      const y = prevY + (gy - prevY) * Math.min(1, dt * 6 || 1);
+      this.groundY.set(p.id, y);
+      rv.group.position.y = y;
       rv.group.rotation.y = -racerHeading(this.path, p.lane, p.position);
       const seg = s.track.segments[p.segmentIndex];
       rv.update(dt, this.time, p, seg.terrain, s.phase, this.particles, this.opts.reducedMotion);
@@ -284,6 +293,7 @@ export class RaceRenderer {
       const gp = this.ghost.positionAt(s.time);
       const lat = racerLateral(this.path, this.ghostLane, gp) + 1.3;
       this.path.sample(gp, lat, this.ghost.group.position);
+      this.ghost.group.position.y = this.ghost.flying(s.time) ? 0 : this.field.trackY(gp);
       this.ghost.group.rotation.y = -racerHeading(this.path, this.ghostLane, gp);
       this.ghost.group.visible = gp > this.anchor - 2.5;
       this.ghost.update(dt, this.time, s.time, s.track, s.phase !== 'countdown');
@@ -309,6 +319,7 @@ export class RaceRenderer {
       this.trexLateral += (racerLateral(this.path, targetLane, s.trex.position) - this.trexLateral) * Math.min(1, dt * 1.5);
       const tp = Math.max(this.anchor - 35, s.trex.position);
       this.path.sample(tp, this.trexLateral, this.trex.root.position);
+      this.trex.root.position.y = this.field.trackY(tp);
       this.trex.root.rotation.y = -this.path.heading(tp);
       this.trexRoar = Math.max(0, this.trexRoar - dt);
       animateDino(this.trex, dt, s.phase === 'racing' ? s.trex.speed : 0, s.phase === 'racing' ? (this.trexRoar > 0 ? 'celebrate' : 'run') : 'idle', this.time);
@@ -328,9 +339,22 @@ export class RaceRenderer {
     const humans = this.humans();
     const lat = humans.length ? humans.reduce((a, p) => a + racerLateral(this.path, p.lane, p.position), 0) / humans.length : 0;
     const desiredPos = this.path.sample(this.anchor - back, lat * 0.35, new THREE.Vector3());
-    desiredPos.y = height;
+    // in a gorge the camera dips a little so the racers stay in view
+    const hs = this.humans();
+    const dip = hs.length ? Math.min(0, ...hs.map((h) => this.groundY.get(h.id) ?? 0)) : 0;
+    desiredPos.y = height + dip * 0.45;
     const look = this.path.sample(this.anchor + ahead, lat * 0.25, new THREE.Vector3());
-    look.y = 1.2;
+    look.y = 1.2 + dip * 0.7;
+    // mist rising from gorges ahead
+    this.mistTimer += dt;
+    if (this.mistTimer > 0.12 && !this.opts.reducedMotion) {
+      this.mistTimer = 0;
+      const md = this.anchor + 8 + Math.random() * 40;
+      if (this.field.trackY(md) < -1.2) {
+        const q = this.path.sample(md, (Math.random() - 0.5) * 16, this.tmp);
+        this.particles.emit('dust', q.x, this.field.trackY(md) + 0.4, q.z, { count: 2, color: [0xffffff, 0xe8f1ff], scale: 2.2 });
+      }
+    }
     if (!this.camInit) {
       this.camPos.copy(desiredPos);
       this.camLook.copy(look);

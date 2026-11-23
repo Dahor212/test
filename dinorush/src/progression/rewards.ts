@@ -1,4 +1,4 @@
-import { ARCHETYPES } from '../config/dinosaurs';
+import { ARCHETYPES, CLASSIC_ROLES } from '../config/dinosaurs';
 import { ECONOMY } from '../config/economy';
 import type { Archetype, MissionDefinition, ParticipantResult, PlayerProfile, RaceResult } from '../types';
 import { evaluateMissions } from './missions';
@@ -73,7 +73,7 @@ export function coinLines(result: RaceResult, r: ParticipantResult): CoinLine[] 
 /** XP per dino used, proportional to distance and successful segments. */
 export function xpForResult(r: ParticipantResult, won: boolean): Record<Archetype, number> {
   const X = ECONOMY.xp;
-  const out: Record<Archetype, number> = { raptor: 0, spino: 0, ankylo: 0, trike: 0 };
+  const out: Record<Archetype, number> = { raptor: 0, spino: 0, ankylo: 0, trike: 0, ptero: 0 };
   const totalUsed = ARCHETYPES.reduce((a, k) => a + r.used[k], 0) || 1;
   const shared = X.finish + (won ? X.win : 0) + r.perfects * X.perPerfect;
   for (const a of ARCHETYPES) {
@@ -135,7 +135,8 @@ export function applyRaceResult(profile: PlayerProfile, result: RaceResult): Rew
     s.combo5Count += Math.floor(r.maxCombo / 5);
     s.smashed += r.smashed;
     s.abilitiesUsed += r.abilitiesUsed;
-    if (ARCHETYPES.every((a) => r.used[a] >= 5)) s.allFourRaces++;
+    // "all four" means the four classic roles (the flyer is a bonus)
+    if (CLASSIC_ROLES.every((a) => r.used[a] >= 5)) s.allFourRaces++;
     if (mode === 'trex' && !r.caught) s.trexEscapes++;
     if (mode === 'endless') s.endlessBest = Math.max(s.endlessBest, r.score);
     if (mode === 'goldRush') s.goldBest = Math.max(s.goldBest, r.coins);

@@ -46,10 +46,12 @@ export function MainMenu() {
       stage.camera.position.set(0, 2.6, 9.5);
       stage.camera.lookAt(0, 0.9, 0);
       stage.floor.scale.set(1.3, 1, 1);
-      ARCHETYPES.forEach((a, i) => {
+      const team = ARCHETYPES.filter((a) => profile.roles.includes(a));
+      team.forEach((a, i) => {
         const id = lineup[a];
         const inst = profile.dinos[id];
-        stage!.addDino(id, inst?.accessory ?? null, [-3.3 + i * 2.2, 0, (i % 2) * 0.6], Math.PI - 0.45 + i * 0.3, 'run', 7 + i, 2.6);
+        const x = (i - (team.length - 1) / 2) * 2.2;
+        stage!.addDino(id, inst?.accessory ?? null, [x, 0, (i % 2) * 0.6], Math.PI - 0.45 + i * 0.3, 'run', 7 + i, 2.6);
       });
       let t = 0;
       stage.onFrame = (dt) => {
@@ -71,7 +73,7 @@ export function MainMenu() {
       stage?.dispose();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lineup.raptor, lineup.spino, lineup.ankylo, lineup.trike, quality]);
+  }, [lineup.raptor, lineup.spino, lineup.ankylo, lineup.trike, lineup.ptero, profile.roles.length, quality]);
 
   useEffect(() => {
     sound.setMusic('menu');

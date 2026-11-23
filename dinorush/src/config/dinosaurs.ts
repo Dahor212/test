@@ -1,6 +1,10 @@
 import type { Archetype, DinosaurAbility, DinosaurDefinition, AbilityId } from '../types';
 
-export const ARCHETYPES: Archetype[] = ['raptor', 'spino', 'ankylo', 'trike'];
+export const ARCHETYPES: Archetype[] = ['raptor', 'spino', 'ankylo', 'trike', 'ptero'];
+/** The classic four roles (quick races of older saves, AI-only races). */
+export const CLASSIC_ROLES: Archetype[] = ['raptor', 'spino', 'ankylo', 'trike'];
+/** Roles a new child starts with; the others are unlocked in the career. */
+export const STARTING_ROLES: Archetype[] = ['raptor', 'spino'];
 
 export interface ArchetypeInfo {
   id: Archetype;
@@ -56,6 +60,16 @@ export const ARCHETYPE_INFO: Record<Archetype, ArchetypeInfo> = {
     ability: 'unstoppableAdvance',
     specialty: 'Bahno, písek, sníh, led',
   },
+  ptero: {
+    id: 'ptero',
+    species: 'Pteranodon',
+    accusative: 'Pteranodona',
+    role: 'LETEC',
+    color: '#ff5fa2',
+    colorDark: '#c2185b',
+    ability: 'skyGlide',
+    specialty: 'Propasti a rokle',
+  },
 };
 
 export const ABILITIES: Record<AbilityId, DinosaurAbility> = {
@@ -94,6 +108,15 @@ export const ABILITIES: Record<AbilityId, DinosaurAbility> = {
     activeOn: ['rough'],
     speedMultiplier: 1.32,
     duration: 2.8,
+  },
+  skyGlide: {
+    id: 'skyGlide',
+    name: 'VZDUŠNÝ KLUZ',
+    description: 'Nabíjí se letem nad propastí. Pak klouže vzduchem jako šíp!',
+    chargeSource: 'airDistance',
+    activeOn: ['air', 'firm'],
+    speedMultiplier: 1.3,
+    duration: 2.4,
   },
 };
 
@@ -244,6 +267,32 @@ export const DINOSAURS: DinosaurDefinition[] = [
     perk: { kind: 'abilityDuration', value: 0.2, description: 'NÁRAZ vydrží o 20 % déle (sólo)' },
     description: 'Ankylosaurus porostlý mechem z džungle.',
   },
+  // ---- Flyers: the fifth role, unlocked in the career ----------------------
+  {
+    id: 'ptero-sky',
+    name: 'Plachťák',
+    species: 'Pteranodon',
+    archetype: 'ptero',
+    model: 'pteranodon',
+    role: 'LETEC',
+    palette: { body: 0xff8fb8, belly: 0xffe6f0, accent: 0xd63384, detail: 0xffd32a, effect: 'none' },
+    rarity: 1,
+    starter: true,
+    description: 'Létající ještěr. Přeletí každou propast, na zemi je ale nemotorný.',
+  },
+  {
+    id: 'ptero-sunset',
+    name: 'Západka',
+    species: 'Pteranodon',
+    archetype: 'ptero',
+    model: 'pteranodon',
+    role: 'LETEC',
+    palette: { body: 0xff9f43, belly: 0xfff1d6, accent: 0x8e44ad, detail: 0xff4757, effect: 'sparkle' },
+    rarity: 2,
+    starter: false,
+    perk: { kind: 'abilityCharge', value: 0.2, description: 'VZDUŠNÝ KLUZ se nabíjí o 20 % rychleji (sólo)' },
+    description: 'Pteranodon barvy zapadajícího slunce.',
+  },
   // ---- New species (met on the career map, later also in eggs) -------------
   {
     id: 'galli-sand',
@@ -345,6 +394,7 @@ export const STARTER_LINEUP: Record<Archetype, string> = {
   spino: 'spino-blue',
   ankylo: 'ankylo-orange',
   trike: 'trike-purple',
+  ptero: 'ptero-sky',
 };
 
 export interface AccessoryDefinition {

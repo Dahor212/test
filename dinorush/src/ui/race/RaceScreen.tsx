@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ABILITIES, ARCHETYPES, ARCHETYPE_INFO } from '../../config/dinosaurs';
+import { ABILITIES, ARCHETYPE_INFO, CLASSIC_ROLES } from '../../config/dinosaurs';
 import { MODES } from '../../config/modes';
 import { TERRAINS } from '../../config/terrain';
 import { sound } from '../../audio/sound';
@@ -12,11 +12,11 @@ import { Button, DinoIcon, Icon, TerrainIcon } from '../components/common';
 import { RaceController } from './RaceController';
 
 const KEYS: string[][] = [
-  ['1', '2', '3', '4'],
-  ['q', 'w', 'e', 'r'],
-  ['u', 'i', 'o', 'p'],
+  ['1', '2', '3', '4', '5'],
+  ['q', 'w', 'e', 'r', 't'],
+  ['u', 'i', 'o', 'p', 'j'],
 ];
-const ALT_KEYS = ['a', 's', 'd', 'f'];
+const ALT_KEYS = ['a', 's', 'd', 'f', 'g'];
 
 const EVENT_TEXT: Record<DynamicEventType, string> = {
   fallingTree: 'Padá strom!',
@@ -166,8 +166,9 @@ export function RaceScreen({ session }: { session: RaceSession }) {
         const keys = KEYS[p.seat] ?? [];
         let idx = keys.indexOf(k);
         if (idx < 0 && p.seat === 0) idx = ALT_KEYS.indexOf(k);
-        if (idx >= 0) {
-          ctrl.press(p.id, ARCHETYPES[idx]);
+        const roles = ctrl.engine.state.config.roles ?? CLASSIC_ROLES;
+        if (idx >= 0 && idx < roles.length) {
+          ctrl.press(p.id, roles[idx]);
           setTick((t) => t + 1);
         }
       }
@@ -596,8 +597,8 @@ function PlayerPanel({
         </div>
         {!compact && nextCard}
       </div>
-      <div className="dino-buttons">
-        {ARCHETYPES.map((a, i) => {
+      <div className={`dino-buttons n-${(s.config.roles ?? CLASSIC_ROLES).length}`}>
+        {(s.config.roles ?? CLASSIC_ROLES).map((a, i) => {
           const info = ARCHETYPE_INFO[a];
           const active = p.current === a;
           const charge = p.abilityCharge[a];

@@ -89,7 +89,7 @@ export function racerHeading(path: TrackPath, lane: number, d: number): number {
   return path.heading(d) + Math.atan(drift);
 }
 
-export type ZoneKind = 'none' | 'water' | 'deep' | 'lava' | 'mud' | 'sand' | 'snow' | 'ice' | 'rock' | 'wood';
+export type ZoneKind = 'none' | 'water' | 'deep' | 'lava' | 'mud' | 'sand' | 'snow' | 'ice' | 'rock' | 'wood' | 'chasm';
 
 export interface Zone {
   kind: ZoneKind;
@@ -120,6 +120,9 @@ export function zoneFor(terrain: TerrainId, world: WorldId): Zone {
       return { kind: 'rock', ext: 10.5, basin: 0 };
     case 'woodBarrier':
       return { kind: 'wood', ext: PATH_HALF, basin: 0 };
+    case 'chasm':
+      // a deep rocky gorge across the whole valley
+      return { kind: 'chasm', ext: 20, basin: 3.3 };
     default:
       return { kind: 'none', ext: PATH_HALF, basin: 0 };
   }
@@ -164,8 +167,20 @@ export class TerrainField {
   }
 
   /** How much the basin applies at distance d (0 outside, 1 inside, smooth banks). */
-  basinFactor(z: { d0: number; d1: number }, d: number) {
+  basinFactor(z: { d0: number; d1: number; kind?: ZoneKind }, d: number) {
+    if (z.kind === 'chasm') {
+      // long slopes: walkers climb down into the gorge and up again
+      const ramp = Math.min(9, (z.d1 - z.d0) * 0.32);
+      return smooth(z.d0, z.d0 + ramp, d) * (1 - smooth(z.d1 - ramp, z.d1, d));
+    }
     return smooth(z.d0 - 0.5, z.d0 + 2.5, d) * (1 - smooth(z.d1 - 2.5, z.d1 + 0.5, d));
+  }
+
+  /** Height of the running surface on the racing line (below 0 only in a gorge). */
+  trackY(d: number): number {
+    const z = this.zoneAt(d);
+    if (z.kind !== 'chasm') return 0;
+    return -z.basin * this.basinFactor(z, d);
   }
 
   hillHeight(d: number, side: number): number {
@@ -200,7 +215,7 @@ export class TerrainField {
     let y = 0;
     if (z.basin > 0) {
       const e = this.edge(z, d, side);
-      const inside = 1 - smooth(e - 4, e, a);
+      const inside = 1 - smooth(e - (z.kind === 'chasm' ? 7 : 4), e, a);
       y -= z.basin * inside * this.basinFactor(z, d);
     }
     const hillStart = Math.max(PATH_HALF + 2.5, this.smoothEdge(d, side) + 1.5);

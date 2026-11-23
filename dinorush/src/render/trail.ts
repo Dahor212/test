@@ -17,6 +17,7 @@ const BLEND = 3.2;
 
 export function layerOf(terrain: TerrainId, world: WorldId): number {
   if (terrain === 'bridge') return TRAIL_LAYERS.indexOf(world === 'volcano' ? 'lava' : 'water');
+  if (terrain === 'chasm') return TRAIL_LAYERS.indexOf('scree');
   return TRAIL_LAYERS.indexOf(terrain as TrailLayer);
 }
 
@@ -259,7 +260,8 @@ export class TrailBuilder {
           this.path.sample(d, o, v);
           const w = band.w(d, o);
           const wet = (WATERY.has(band.a) ? 1 - w : 0) + (WATERY.has(band.b) ? w : 0);
-          pos.push(v.x, 0.02 + wet * 0.016, v.z);
+          // in a gorge the trail follows the ground down and up again
+          pos.push(v.x, zone.kind === 'chasm' ? Math.min(0.02, this.field.groundY(d, o) + 0.02) : 0.02 + wet * 0.016, v.z);
           uv.push(o / UV, d / UV);
           const fade = wide ? 3.2 : 1.8;
           const alpha = 1 - smooth(e - fade, e, Math.abs(o));
@@ -308,7 +310,7 @@ export class TrailBuilder {
     for (let d = Math.ceil(c0 / 1.3) * 1.3; d < c1; d += 1.3) {
       const seg = this.segAt(d);
       const zone = zoneFor(seg.terrain, w);
-      if (zone.kind === 'water' || zone.kind === 'deep' || zone.kind === 'lava' || zone.kind === 'ice') continue;
+      if (zone.kind === 'water' || zone.kind === 'deep' || zone.kind === 'lava' || zone.kind === 'ice' || zone.kind === 'chasm') continue;
       for (const side of [-1, 1]) {
         const r = hash01(d * 3.7 + side * 11);
         const e = this.extent(d, side);

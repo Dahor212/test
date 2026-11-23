@@ -1,7 +1,8 @@
 import type { Archetype, ObstacleKind, Suitability, TerrainCategory, TerrainDefinition, TerrainId } from '../types';
 
 function suit(best: Archetype, rest: Partial<Record<Archetype, Suitability>>): Record<Archetype, Suitability> {
-  const base: Record<Archetype, Suitability> = { raptor: 'bad', spino: 'bad', ankylo: 'bad', trike: 'bad' };
+  // flyers are clumsy on the ground: bad everywhere unless stated otherwise
+  const base: Record<Archetype, Suitability> = { raptor: 'bad', spino: 'bad', ankylo: 'bad', trike: 'bad', ptero: 'bad' };
   return { ...base, ...rest, [best]: 'best' };
 }
 
@@ -15,7 +16,7 @@ export const TERRAINS: Record<TerrainId, TerrainDefinition> = {
     name: 'Tráva',
     category: 'firm',
     best: 'raptor',
-    suitability: suit('raptor', { trike: 'ok', ankylo: 'bad', spino: 'bad' }),
+    suitability: suit('raptor', { trike: 'ok', ankylo: 'bad', spino: 'bad', ptero: 'ok' }),
     color: 0x6ccf3d,
     color2: 0x58b82e,
     icon: 'grass',
@@ -26,7 +27,7 @@ export const TERRAINS: Record<TerrainId, TerrainDefinition> = {
     name: 'Pevná cesta',
     category: 'firm',
     best: 'raptor',
-    suitability: suit('raptor', { trike: 'ok', ankylo: 'ok', spino: 'bad' }),
+    suitability: suit('raptor', { trike: 'ok', ankylo: 'ok', spino: 'bad', ptero: 'ok' }),
     color: 0xd9a066,
     color2: 0xc48a52,
     icon: 'path',
@@ -37,7 +38,7 @@ export const TERRAINS: Record<TerrainId, TerrainDefinition> = {
     name: 'Most',
     category: 'firm',
     best: 'raptor',
-    suitability: suit('raptor', { trike: 'ok', ankylo: 'ok', spino: 'bad' }),
+    suitability: suit('raptor', { trike: 'ok', ankylo: 'ok', spino: 'bad', ptero: 'ok' }),
     color: 0xa0632e,
     color2: 0x7d4a1f,
     icon: 'bridge',
@@ -144,6 +145,18 @@ export const TERRAINS: Record<TerrainId, TerrainDefinition> = {
     color2: 0xd8f5ff,
     icon: 'ice',
     warning: 'Led',
+  },
+  chasm: {
+    id: 'chasm',
+    name: 'Propast',
+    category: 'air',
+    best: 'ptero',
+    // the others have to climb down into the gorge and up again
+    suitability: suit('ptero', { raptor: 'bad', trike: 'bad', ankylo: 'awful', spino: 'awful' }),
+    color: 0x5b4a44,
+    color2: 0x3d302c,
+    icon: 'chasm',
+    warning: 'Propast',
   },
 };
 

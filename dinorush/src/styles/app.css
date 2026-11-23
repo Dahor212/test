@@ -744,10 +744,36 @@ button {
   gap: 12px;
   min-height: 0;
 }
+.dino-buttons.n-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+.dino-buttons.n-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+.dino-buttons.n-5 {
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
 .compact .dino-buttons {
   grid-template-columns: repeat(2, 1fr);
   grid-template-rows: repeat(2, 1fr);
   gap: 8px;
+}
+.compact .dino-buttons.n-2 {
+  grid-template-rows: 1fr;
+}
+.compact .dino-buttons.n-3 {
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: 1fr;
+}
+.compact .dino-buttons.n-5 {
+  grid-template-columns: repeat(6, 1fr);
+}
+.compact .dino-buttons.n-5 > :nth-child(-n + 3) {
+  grid-column: span 2;
+}
+.compact .dino-buttons.n-5 > :nth-child(n + 4) {
+  grid-column: span 3;
 }
 .dino-btn {
   --dc: #4cd137;

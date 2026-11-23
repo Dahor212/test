@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { ACCESSORY_BY_ID, DINO_BY_ID } from '../config/dinosaurs';
-import type { DinoPalette, ModelId } from '../types';
+import type { Archetype, DinoPalette, ModelId } from '../types';
 import { creatureMaterial, fanGeometry, hornGeometry, loftBody, mix, Parts, PG, sheetGeometry, shade, smooth, type BodyKey } from './creature';
 import {
   addEye,
@@ -542,10 +542,13 @@ export function createPtero(): DinoRig {
 
 const BUILDERS: Record<ModelId, (p: DinoPalette) => DinoRig> = { raptor, spino, baryonyx, ankylo, trike, styraco, ...SPECIES_BUILDERS };
 
-/** Model of a dinosaur definition (classic archetype model when not set). */
+/** Classic model of each role. */
+export const ROLE_MODEL: Record<Archetype, ModelId> = { raptor: 'raptor', spino: 'spino', ankylo: 'ankylo', trike: 'trike', ptero: 'pteranodon' };
+
+/** Model of a dinosaur definition (classic role model when not set). */
 export function modelOf(defId: string): ModelId {
   const def = DINO_BY_ID[defId];
-  return def?.model ?? def?.archetype ?? 'raptor';
+  return def?.model ?? (def ? ROLE_MODEL[def.archetype] : 'raptor');
 }
 
 export function createDino(model: ModelId, palette: DinoPalette, accessory: string | null = null): DinoRig {

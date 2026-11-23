@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { EXPLORER_LEVELS, FOSSILS, goalIcon, goalText, LEVEL_BY_ID, REGIONS } from '../../config/campaign';
+import { EXPLORER_LEVELS, FOSSILS, goalIcon, goalText, LEVEL_BY_ID, REGIONS, ROLE_MILESTONES } from '../../config/campaign';
 import { ARCHETYPE_INFO, DINO_BY_ID } from '../../config/dinosaurs';
 import { dailySpec, formatDailyValue } from '../../progression/daily';
 import { MODES } from '../../config/modes';
 import { sound } from '../../audio/sound';
 import { store, useApp } from '../../state/store';
 import type { ParticipantResult } from '../../types';
-import { Button, CoinCounter, DinoThumb, formatTime, GoalList, Icon, Stars } from '../components/common';
+import { Button, CoinCounter, DinoIcon, DinoThumb, formatTime, GoalList, Icon, Stars } from '../components/common';
 
 function useCountUp(target: number, ms = 1200) {
   const [v, setV] = useState(0);
@@ -105,6 +105,16 @@ export function ResultsScreen() {
                   <Icon name="star" size={24} className="star-on" /> Nové hvězdy: +{camp.newStars}
                 </div>
               )}
+              {camp.newRoles.map((r) => (
+                <div key={r} className="role-unlock" data-testid={`role-unlock-${r}`} style={{ ['--rc' as string]: ARCHETYPE_INFO[r].color }}>
+                  <DinoIcon archetype={r} size={72} />
+                  <span>
+                    <small>Nový dinosaurus v týmu!</small>
+                    <b>{ARCHETYPE_INFO[r].role} – {ARCHETYPE_INFO[r].species}</b>
+                    <em>{ROLE_MILESTONES.find((m) => m.role === r)?.text}</em>
+                  </span>
+                </div>
+              ))}
               <div className="lr-rewards">
                 {camp.xp > 0 && (
                   <span className="lr-chip xp">

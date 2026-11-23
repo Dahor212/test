@@ -1,5 +1,5 @@
 import { AI_PROFILES } from '../config/difficulty';
-import { ARCHETYPES } from '../config/dinosaurs';
+import { CLASSIC_ROLES } from '../config/dinosaurs';
 import { Rng } from '../core/rng';
 import type { AIProfile, AIProfileId, Archetype, RaceParticipant, RaceState } from '../types';
 import { nextChange } from './track';
@@ -42,6 +42,7 @@ export class AIController {
 
   update(ctx: AIContext, p: RaceParticipant) {
     const { state } = ctx;
+    this.roles = state.config.roles ?? CLASSIC_ROLES;
     if (p.finished || state.phase !== 'racing') return;
     const track = state.track;
     const seg = track.segments[p.segmentIndex];
@@ -89,6 +90,9 @@ export class AIController {
     }
   }
 
+  /** Dinosaur roles of the race (set on every update). */
+  private roles: Archetype[] = CLASSIC_ROLES;
+
   private makePlan(segIndex: number, recommended: Archetype, p: RaceParticipant, now: number) {
     const prof = this.profile;
     const correct = this.rng.chance(prof.accuracy);
@@ -96,7 +100,7 @@ export class AIController {
     if (correct) this.correctDecisions++;
     let target: Archetype = recommended;
     if (!correct) {
-      const others = ARCHETYPES.filter((a) => a !== recommended);
+      const others = this.roles.filter((a) => a !== recommended);
       // Half of the mistakes are "didn't notice" (keep current dino).
       target = this.rng.chance(0.5) && p.current !== recommended ? p.current : this.rng.pick(others);
     }

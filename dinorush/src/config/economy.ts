@@ -74,6 +74,7 @@ export const EGG_SEQUENCE: EggReward[] = [
   { kind: 'dino', id: 'dilo-jungle' },
   { kind: 'dino', id: 'pachy-rock' },
   { kind: 'dino', id: 'brachio-ice' },
+  { kind: 'dino', id: 'ptero-sunset' },
 ];
 
 export const DECORATIONS: Record<DecorationId, ParkDecoration> = {

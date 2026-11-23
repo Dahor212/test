@@ -42,7 +42,7 @@ function assert(cond, msg) {
 
 const LAUNCH = { args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] };
 
-async function newPage(browser, { timescale = 1, viewport = { width: 1180, height: 820 }, device } = {}) {
+async function newPage(browser, { timescale = 1, viewport = { width: 1180, height: 820 }, device, classicRoles = true } = {}) {
   const ctx = await browser.newContext(device ? { ...device } : { viewport, hasTouch: true, deviceScaleFactor: 1 });
   const page = await ctx.newPage();
   page.__errors = [];
@@ -684,6 +684,60 @@ async function main() {
       assert(active === 'Hráč 1', 'switched ' + active);
       await ctx.close();
       return `2 profily; společný závod připsal oběma (${after.map((p) => `${p.name}: ${p.coins}`).join(', ')}); po obnovení výběr hráče`;
+    });
+
+    await test(26, 'Postupné odemykání dinosaurů a Letec nad propastí', async () => {
+      const { page, ctx } = await newPage(browser, { timescale: 12, classicRoles: false });
+      const roles0 = await page.evaluate(() => window.__dinorush.store.get().profile.roles.join(','));
+      assert(roles0 === 'raptor,spino', 'a new child starts with two dinosaurs: ' + roles0);
+      for (const id of ['jungle-1', 'jungle-2']) {
+        await page.evaluate((id) => {
+          window.__race = null;
+          window.__dinorush.store.startCampaignLevel(id);
+        }, id);
+        await page.waitForFunction(() => window.__race && window.__race.engine && window.__race.engine.state.phase === 'racing', null, { timeout: 30000 });
+        const buttons = await page.locator('.dino-btn').count();
+        assert(buttons === 2, `${id}: two buttons, got ${buttons}`);
+        const terrains = await page.evaluate(() => [...new Set(window.__race.engine.state.track.segments.map((s) => s.terrain))]);
+        assert(terrains.every((t) => ['grass', 'path', 'water', 'deepWater'].includes(t)), 'only firm ground and water: ' + terrains);
+        await startBot(page, ['p0']);
+        await waitResults(page);
+      }
+      assert(await page.getByTestId('role-unlock-ankylo').isVisible(), 'BOURÁK joins after the second place');
+      await page.screenshot({ path: join(OUT, 't26-role-unlock.png') });
+      await page.evaluate(() => {
+        window.__race = null;
+        window.__dinorush.store.startCampaignLevel('jungle-3');
+      });
+      await page.waitForFunction(() => window.__race && window.__race.engine && window.__race.engine.state.phase === 'racing', null, { timeout: 30000 });
+      const three = await page.locator('.dino-btn').count();
+      assert(three === 3, 'three buttons after the milestone: ' + three);
+      // later: all five with the flyer and gorges
+      await page.evaluate(() => {
+        const st = window.__dinorush.store;
+        st.updateProfile((p) => {
+          for (const id of ['jungle-3', 'jungle-4', 'jungle-5', 'swamp-1', 'swamp-2', 'swamp-3', 'swamp-4', 'swamp-5']) p.campaign.stars[id] = 1;
+        });
+        st.updateProfile((p) => (p.roles = ['raptor', 'spino', 'ankylo', 'trike', 'ptero']));
+        window.__race = null;
+        st.startCampaignLevel('ice-1');
+      });
+      await page.waitForFunction(() => window.__race && window.__race.engine && window.__race.engine.state.phase === 'racing', null, { timeout: 30000 });
+      const five = await page.locator('.dino-btn').count();
+      const chasms = await page.evaluate(() => window.__race.engine.state.track.segments.filter((s) => s.terrain === 'chasm').length);
+      assert(five === 5 && chasms > 0, `five buttons (${five}) and gorges (${chasms})`);
+      await startBot(page, ['p0']);
+      await page.waitForFunction(() => {
+        const s = window.__race.engine.state;
+        const h = s.participants.find((x) => x.kind === 'human');
+        return s.track.segments[h.segmentIndex].terrain === 'chasm' && h.current === 'ptero';
+      }, null, { timeout: 120000 });
+      await page.waitForTimeout(400);
+      const fly = await page.evaluate(() => window.__race.engine.state.participants.find((x) => x.kind === 'human').terrainFactor);
+      await page.screenshot({ path: join(OUT, 't26-flyer.png') });
+      await ctx.close();
+      assert(fly > 1, 'the flyer is fast over the gorge: ' + fly);
+      return `2 → 3 dinosauři po 2. místě (BOURÁK); s Letcem 5 tlačítek, ${chasms} propasti, Letec nad propastí ×${fly.toFixed(2)}`;
     });
 
     for (const p of [p1, p2, p3, p4, p5]) if (p.__errors.length) console.log('page errors:', p.__errors);

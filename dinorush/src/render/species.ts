@@ -419,12 +419,83 @@ function brachio(p: DinoPalette): DinoRig {
   return rig;
 }
 
+// ---------------------------------------------------------------------------
+// Pteranodon – the flyer (LETEC); always flies low above the track
+// ---------------------------------------------------------------------------
+
+function pteranodon(p: DinoPalette): DinoRig {
+  const rig = newRig('ptero', p);
+  const skin = makeSkinMaterial(p, rig.animatedMaterials);
+  const em = bodyEmissive(p);
+  const keys: BodyKey[] = [
+    { z: -1.3, y: 0.16, w: 0.008, h: 0.008 },
+    { z: -1.12, y: 0.14, w: 0.03, h: 0.032 },
+    { z: -0.88, y: 0.12, w: 0.055, h: 0.064 },
+    { z: -0.68, y: 0.12, w: 0.085, h: 0.1 },
+    { z: -0.56, y: 0.07, w: 0.058, h: 0.066 },
+    { z: -0.42, y: 0.02, w: 0.07, h: 0.078 },
+    { z: -0.22, y: 0.0, w: 0.15, h: 0.15 },
+    { z: 0.02, y: 0.0, w: 0.17, h: 0.16 },
+    { z: 0.24, y: 0.0, w: 0.12, h: 0.11 },
+    { z: 0.42, y: 0.01, w: 0.05, h: 0.05 },
+    { z: 0.56, y: 0.02, w: 0.01, h: 0.01 },
+  ];
+  const sp = buildSpine({ keys, head: 3, neck: [5], chest: 6, pelvis: 8, tail: [9], color: skinColor(p, { beakUntil: 0.12, dorsal: 0.72 }) }, skin);
+  const hp = sp.parts.get(sp.head)!;
+  for (const side of [-1, 1]) addEye(hp, sp.local(sp.head, [side * 0.07, 0.17, -0.72]), 0.034, side, 0xffb300, p.body, true);
+  // the long backward crest
+  hp.addMatrix(
+    PG.cone(8),
+    (q) => mix(p.accent, p.detail, smooth(0, 1, q.y)),
+    new THREE.Matrix4().compose(new THREE.Vector3(...sp.local(sp.head, [0, 0.2, -0.6])), new THREE.Quaternion().setFromEuler(new THREE.Euler(-1.95, 0, 0)), new THREE.Vector3(0.05, 0.5, 0.11)),
+  );
+  rig.headTop.position.set(...sp.local(sp.head, [0, 0.24, -0.66]));
+  rig.face.position.set(...sp.local(sp.head, [0, 0.17, -0.78]));
+  rig.face.scale.setScalar(0.55);
+  rig.headTop.scale.setScalar(0.55);
+  // little dangling legs
+  const pp = sp.parts.get(sp.pelvis)!;
+  for (const side of [-1, 1]) {
+    pp.add(PG.sphere(8, 6), shade(p.body, 0.8), sp.local(sp.pelvis, [side * 0.08, -0.12, 0.32]), [0.9, 0, 0], [0.035, 0.16, 0.04]);
+    pp.add(PG.sphere(6, 5), shade(p.body, 0.6), sp.local(sp.pelvis, [side * 0.08, -0.2, 0.46]), [0, 0, 0], [0.04, 0.025, 0.06]);
+  }
+  finishSpine(rig, sp, em, skin);
+  // big membrane wings with a bony leading edge
+  for (const side of [-1, 1]) {
+    const w = new THREE.Group();
+    w.position.set(side * 0.12, 0.04, -0.16);
+    const shape = new THREE.Shape();
+    shape.moveTo(0, -0.18);
+    shape.quadraticCurveTo(0.9, -0.22, 1.75, 0.3);
+    shape.quadraticCurveTo(1.15, 0.28, 0.75, 0.5);
+    shape.quadraticCurveTo(0.35, 0.52, 0, 0.34);
+    shape.lineTo(0, -0.18);
+    const g = new THREE.ShapeGeometry(shape, 12).rotateX(-Math.PI / 2);
+    if (side < 0) g.scale(-1, 1, 1);
+    const wp = new Parts();
+    wp.add(g, (q) => mix(p.body, p.accent, smooth(0.3, 1.7, Math.abs(q.x))), [0, 0, 0], [0, 0, 0], 1, 'membrane');
+    const edge = new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0.01, 0.16), new THREE.Vector3(side * 0.9, 0.02, 0.2), new THREE.Vector3(side * 1.75, 0.0, -0.3)]);
+    wp.add(new THREE.TubeGeometry(edge, 12, 0.03, 6, false), shade(p.body, 0.85), [0, 0, 0], [0, 0, 0], 1);
+    wp.build(w, em, skin);
+    rig.hips.add(w);
+    rig.wings.push(w);
+  }
+  // a big wingspan so the flyer reads well next to the walkers
+  rig.root.scale.setScalar(1.35);
+  rig.hipHeight = 1.3;
+  rig.height = 2.4;
+  rig.length = 2.6;
+  rig.stride = 3;
+  return rig;
+}
+
 /** Builders of the newer species. Styracosaurus and Baryonyx share the
  * Triceratops / Spinosaurus body plans (see dinoModels.ts). */
-export const SPECIES_BUILDERS: Record<'gallimimus' | 'dilophosaurus' | 'stego' | 'pachy' | 'brachio', (p: DinoPalette) => DinoRig> = {
+export const SPECIES_BUILDERS: Record<'gallimimus' | 'dilophosaurus' | 'stego' | 'pachy' | 'brachio' | 'pteranodon', (p: DinoPalette) => DinoRig> = {
   gallimimus,
   dilophosaurus,
   stego,
   pachy,
   brachio,
+  pteranodon,
 };

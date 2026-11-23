@@ -1,4 +1,4 @@
-import { DINOSAURS, STARTER_LINEUP } from '../config/dinosaurs';
+import { DINOSAURS, STARTER_LINEUP, STARTING_ROLES } from '../config/dinosaurs';
 import { PLAYER_COLORS } from '../config/difficulty';
 import { PARK_SIZE } from '../config/economy';
 import type { Archetype, Avatar, DailyState, DifficultyId, DinosaurInstance, GameSettings, LifetimeStats, PlayerProfile } from '../types';
@@ -85,6 +85,7 @@ export function createDefaultProfile(now = Date.now()): PlayerProfile {
     tutorialDone: false,
     lastSetup: null,
     campaign: { difficulty: 'racer', stars: {}, current: null, xp: 0, fossils: [], badges: [], friends: [] },
+    roles: [...STARTING_ROLES],
     daily: emptyDaily(),
     ghosts: {},
   };

@@ -8,11 +8,14 @@ import {
   LEVELS_PER_REGION,
   REGIONS,
   RIVAL_ID,
+  ROLE_MILESTONES,
   START_LEVEL,
 } from '../config/campaign';
+import { ARCHETYPES } from '../config/dinosaurs';
 import { DIFFICULTIES } from '../config/difficulty';
 import type {
   AIProfileId,
+  Archetype,
   CampaignLevel,
   DifficultyId,
   GameModeId,
@@ -188,6 +191,21 @@ export interface CampaignOutcome {
   /** Dinosaur that joined now. */
   friend: string | null;
   badge: RegionId | null;
+  /** Dinosaur roles that joined the team now (milestones). */
+  newRoles: Archetype[];
+}
+
+/** Adds roles whose milestone place has a star. Mutates profile, returns the new ones. */
+export function unlockRoles(profile: PlayerProfile): Archetype[] {
+  const out: Archetype[] = [];
+  for (const m of ROLE_MILESTONES) {
+    if (profile.roles.includes(m.role)) continue;
+    if (m.after.some((id) => levelStars(profile, id) > 0)) {
+      out.push(m.role);
+      profile.roles = ARCHETYPES.filter((a) => a === m.role || profile.roles.includes(a));
+    }
+  }
+  return out;
 }
 
 /** Stores the stars of a finished place and pays rewards. Mutates profile. */
@@ -250,6 +268,7 @@ export function applyCampaignResult(
   profile.eggs.pending += eggs;
   profile.coins += coins;
   profile.totalCoinsEarned += coins;
+  const newRoles = unlockRoles(profile);
   const opened = CAMPAIGN_LEVELS.filter((l) => !openBefore.has(l.id) && isUnlocked(profile, l));
   const nextOpen = opened[0] ?? nextPlaces(level).find((l) => isUnlocked(profile, l)) ?? null;
   const newRegion = opened.find((l) => l.index === 0);
@@ -270,6 +289,7 @@ export function applyCampaignResult(
     fossil,
     friend,
     badge,
+    newRoles,
   };
 }
 

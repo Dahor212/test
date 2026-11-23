@@ -1,5 +1,5 @@
 import { hashString } from '../core/rng';
-import type { CampaignLevel, CampaignMode, RegionDefinition, RegionId, StarGoal, TerrainId, WorldLook } from '../types';
+import type { Archetype, CampaignLevel, CampaignMode, RegionDefinition, RegionId, StarGoal, TerrainId, WorldLook } from '../types';
 
 /**
  * Career map ("Dobrodružství"): one island with six regions. Every place is
@@ -15,7 +15,7 @@ export const REGIONS: Record<RegionId, RegionDefinition> = {
     name: 'Pravěký prales',
     subtitle: 'Kapradiny, říčky a padlé kmeny',
     world: 'jungle',
-    terrainPool: { grass: 3, path: 2, water: 3, deepWater: 1, stones: 2, woodBarrier: 2, mud: 2, sand: 1 },
+    terrainPool: { grass: 3, path: 2, water: 3, deepWater: 1, stones: 2, woodBarrier: 2 },
     colors: ['#43e97b', '#2f9e55'],
     badge: 'Odznak pralesa',
   },
@@ -65,7 +65,7 @@ export const REGIONS: Record<RegionId, RegionDefinition> = {
     name: 'Sopečné údolí',
     subtitle: 'Lávové mosty a horké prameny',
     world: 'volcano',
-    terrainPool: { path: 3, bridge: 2, scree: 3, stones: 2, water: 1, deepWater: 1, sand: 2, mud: 1 },
+    terrainPool: { path: 3, bridge: 2, scree: 3, stones: 2, water: 1, deepWater: 1, sand: 2, mud: 1, chasm: 2 },
     colors: ['#ff7f50', '#a8412a'],
     badge: 'Odznak sopky',
   },
@@ -74,7 +74,7 @@ export const REGIONS: Record<RegionId, RegionDefinition> = {
     name: 'Ledová doba',
     subtitle: 'Sníh, led a zamrzlá jezera',
     world: 'ice',
-    terrainPool: { path: 2, grass: 1, snow: 3, ice: 3, water: 2, deepWater: 1, stones: 2, scree: 1 },
+    terrainPool: { path: 2, grass: 1, snow: 3, ice: 3, water: 2, deepWater: 1, stones: 2, scree: 1, chasm: 2 },
     colors: ['#a8dcff', '#5aa9e6'],
     badge: 'Odznak ledové doby',
   },
@@ -83,7 +83,7 @@ export const REGIONS: Record<RegionId, RegionDefinition> = {
     name: 'Dinosauří ostrovy',
     subtitle: 'Pláže, palmy a laguny',
     world: 'islands',
-    terrainPool: { sand: 3, grass: 2, bridge: 2, water: 3, deepWater: 2, woodBarrier: 2, stones: 1, mud: 1 },
+    terrainPool: { sand: 3, grass: 2, bridge: 2, water: 3, deepWater: 2, woodBarrier: 2, stones: 1, mud: 1, chasm: 2 },
     colors: ['#4dd0e1', '#1e9fb3'],
     badge: 'Odznak ostrovů',
   },
@@ -140,10 +140,10 @@ const chase = (lead: number, third: StarGoal): [StarGoal, StarGoal, StarGoal] =>
 
 const PLACES: Record<RegionId, PlaceSpec[]> = {
   jungle: [
-    { title: 'Kapradinový palouk', mode: 'classic', x: 110, y: 610, length: 600, ai: 'easy', fossil: 'leaf', goals: race({ kind: 'perfects', value: 2 }) },
-    { title: 'Říčka u vodopádu', mode: 'classic', x: 205, y: 580, length: 700, ai: 'easy', fossil: 'fish', pool: { grass: 3, water: 4, deepWater: 1, path: 2, stones: 1, mud: 1 }, goals: race({ kind: 'combo', value: 4 }) },
-    { title: 'Hřebínkova mýtina', mode: 'goldRush', x: 150, y: 500, length: 800, ai: 'easy', friend: 'dilo-jungle', fossil: 'claw', goals: race({ kind: 'combo', value: 4 }) },
-    { title: 'Padlé kmeny', mode: 'classic', x: 250, y: 460, length: 900, ai: 'normal', fossil: 'amber', pool: { grass: 3, woodBarrier: 4, path: 2, mud: 2, water: 1 }, goals: race({ kind: 'smash', value: 4 }) },
+    { title: 'Kapradinový palouk', mode: 'classic', x: 110, y: 610, length: 600, ai: 'easy', fossil: 'leaf', pool: { grass: 3, path: 2, water: 3 }, goals: race({ kind: 'perfects', value: 2 }) },
+    { title: 'Říčka u vodopádu', mode: 'classic', x: 205, y: 580, length: 700, ai: 'easy', fossil: 'fish', pool: { grass: 3, water: 4, deepWater: 1, path: 2 }, goals: race({ kind: 'combo', value: 4 }) },
+    { title: 'Hřebínkova mýtina', mode: 'goldRush', x: 150, y: 500, length: 800, ai: 'easy', friend: 'dilo-jungle', fossil: 'claw', pool: { grass: 3, path: 2, water: 2, stones: 3, woodBarrier: 2 }, goals: race({ kind: 'smash', value: 3 }) },
+    { title: 'Padlé kmeny', mode: 'classic', x: 250, y: 460, length: 900, ai: 'normal', fossil: 'amber', pool: { grass: 3, woodBarrier: 4, path: 2, water: 2, stones: 1 }, goals: race({ kind: 'smash', value: 4 }) },
     { title: 'Král džungle', mode: 'trex', x: 345, y: 520, length: 900, ai: 'hard', boss: 'trex', goals: chase(15, { kind: 'mistakes', value: 2 }) },
   ],
   swamp: [
@@ -161,14 +161,14 @@ const PLACES: Record<RegionId, PlaceSpec[]> = {
     { title: 'Pán kaňonu', mode: 'classic', x: 650, y: 455, boss: 'rival', ai: 'hard', goals: rival({ kind: 'mistakes', value: 2 }) },
   ],
   volcano: [
-    { title: 'Horké prameny', mode: 'classic', x: 600, y: 405, ai: 'easy', fossil: 'pebble', pool: { water: 3, path: 3, scree: 2, stones: 2, sand: 1 }, goals: race({ kind: 'perfects', value: 3 }) },
+    { title: 'Kouřící průrva', mode: 'classic', x: 600, y: 405, ai: 'easy', fossil: 'pebble', pool: { water: 2, path: 3, scree: 2, stones: 2, chasm: 3 }, goals: race({ kind: 'perfects', value: 3 }) },
     { title: 'Lávové mosty', mode: 'classic', x: 510, y: 345, fossil: 'crystal', pool: { bridge: 4, path: 3, scree: 2, stones: 1, mud: 1 }, goals: race({ kind: 'combo', value: 5 }) },
     { title: 'Tvrdohlavcova skála', mode: 'classic', x: 565, y: 265, friend: 'pachy-rock', fossil: 'dome', pool: { stones: 4, scree: 2, path: 2, sand: 2, water: 1 }, goals: race({ kind: 'smash', value: 5 }) },
     { title: 'Popelová pláň', mode: 'goldRush', x: 665, y: 250, fossil: 'vertebra', goals: race({ kind: 'combo', value: 6 }) },
     { title: 'Lávový T-Rex', mode: 'trex', x: 745, y: 320, boss: 'trex', ai: 'hard', goals: chase(18, { kind: 'mistakes', value: 2 }) },
   ],
   ice: [
-    { title: 'Zamrzlé jezero', mode: 'classic', x: 385, y: 150, ai: 'easy', fossil: 'icefern', pool: { ice: 4, snow: 2, path: 2, water: 1, stones: 1 }, goals: race({ kind: 'perfects', value: 3 }) },
+    { title: 'Ledová rokle', mode: 'classic', x: 385, y: 150, ai: 'easy', fossil: 'icefern', pool: { ice: 3, snow: 2, path: 2, water: 1, chasm: 3 }, goals: race({ kind: 'perfects', value: 3 }) },
     { title: 'Sněžné pole', mode: 'goldRush', x: 470, y: 100, fossil: 'mammoth', pool: { snow: 4, path: 2, stones: 2, water: 1, ice: 1 }, goals: race({ kind: 'combo', value: 5 }) },
     { title: 'Dlouhánův průsmyk', mode: 'classic', x: 560, y: 135, friend: 'brachio-ice', fossil: 'bone', pool: { snow: 3, ice: 2, stones: 2, path: 2, water: 1 }, goals: race({ kind: 'mistakes', value: 3 }) },
     { title: 'Ledopád', mode: 'trex', x: 630, y: 80, fossil: 'tooth', goals: chase(22, { kind: 'perfects', value: 4 }) },
@@ -252,6 +252,17 @@ export const CAMPAIGN_REWARDS = {
   bossCoins: 100,
   bossEggs: 1,
 };
+
+/**
+ * New dinosaur roles join the team at milestones of the map: the career
+ * starts with RYCHLÍK and PLAVEC only; tracks of a place only contain the
+ * terrains of the roles a child has by then.
+ */
+export const ROLE_MILESTONES: { role: Archetype; after: string[]; text: string }[] = [
+  { role: 'ankylo', after: ['jungle-2'], text: 'Teď už rozbiješ kameny i dřevěné zdi!' },
+  { role: 'trike', after: ['jungle-5'], text: 'Bahno, písek ani sníh tě nezastaví!' },
+  { role: 'ptero', after: ['swamp-5', 'canyon-5'], text: 'Přeletíš každou propast!' },
+];
 
 /** Explorer levels – kid-friendly titles and what reaching them gives. */
 export const EXPLORER_LEVELS: { xp: number; title: string; reward: { coins?: number; eggs?: number } }[] = [

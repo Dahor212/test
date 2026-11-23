@@ -21,7 +21,7 @@ export function DailyScreen() {
   const world = WORLDS[spec.worldId];
   const mode = MODES[spec.mode];
   const mine = profile.daily.key === key ? profile.daily : null;
-  const ghost = profile.ghosts[ghostKeyDaily(key, profile.campaign.difficulty)];
+  const ghost = profile.ghosts[`${ghostKeyDaily(key, profile.campaign.difficulty)}:${profile.roles.length}`];
   const table = profiles
     .map((p) => ({ p, d: p.daily.key === key ? p.daily : null }))
     .sort((a, b) => {

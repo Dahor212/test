@@ -1,7 +1,7 @@
 import type { Archetype, GhostData } from '../types';
 
-const TO_LETTER: Record<Archetype, string> = { raptor: 'r', spino: 's', ankylo: 'a', trike: 't' };
-const FROM_LETTER: Record<string, Archetype> = { r: 'raptor', s: 'spino', a: 'ankylo', t: 'trike' };
+const TO_LETTER: Record<Archetype, string> = { raptor: 'r', spino: 's', ankylo: 'a', trike: 't', ptero: 'p' };
+const FROM_LETTER: Record<string, Archetype> = { r: 'raptor', s: 'spino', a: 'ankylo', t: 'trike', p: 'ptero' };
 
 /** Seconds of race time between two stored ghost samples. */
 export const GHOST_DT = 0.5;

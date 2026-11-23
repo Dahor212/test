@@ -1,4 +1,4 @@
-import { ABILITIES, ARCHETYPES, ARCHETYPE_INFO } from '../config/dinosaurs';
+import { ABILITIES, ARCHETYPES, ARCHETYPE_INFO, CLASSIC_ROLES } from '../config/dinosaurs';
 import { DIFFICULTIES } from '../config/difficulty';
 import { GAME_CONFIG } from '../config/gameConfig';
 import { MODES } from '../config/modes';
@@ -43,7 +43,7 @@ export interface ParticipantSetup {
 }
 
 function zeroRecord(): Record<Archetype, number> {
-  return { raptor: 0, spino: 0, ankylo: 0, trike: 0 };
+  return { raptor: 0, spino: 0, ankylo: 0, trike: 0, ptero: 0 };
 }
 
 /**
@@ -83,6 +83,7 @@ export class RaceEngine {
           coins: this.mode.trackCoins,
           length: config.trackLengthOverride,
           terrainPool: config.terrainPool,
+          roles: config.roles,
         });
         t = this.generator.track;
       }
@@ -210,6 +211,8 @@ export class RaceEngine {
     const p = this.participant(id);
     if (!p || p.finished || s.phase === 'finished') return false;
     if (arch === p.current) return false;
+    // only dinosaurs this race knows (2 at the start of the career, up to 5)
+    if (!(s.config.roles ?? CLASSIC_ROLES).includes(arch)) return false;
     if (p.sinceSwitch < p.switchCooldown) return false;
     p.previous = p.current;
     p.current = arch;
@@ -472,6 +475,7 @@ export class RaceEngine {
     if (a === 'raptor' && cat === 'firm') add = ds * A.firmChargePerMetre;
     else if (a === 'spino' && cat === 'water') add = ds * A.waterChargePerMetre;
     else if (a === 'trike' && cat === 'rough') add = ds * A.roughChargePerMetre;
+    else if (a === 'ptero' && cat === 'air') add = ds * A.airChargePerMetre;
     if (add > 0) p.abilityCharge[a] = Math.min(100, p.abilityCharge[a] + add * mul);
   }
 
@@ -622,6 +626,7 @@ export class RaceEngine {
         spino: p.loadout.spino.defId,
         ankylo: p.loadout.ankylo.defId,
         trike: p.loadout.trike.defId,
+        ptero: p.loadout.ptero.defId,
       },
     }));
     const res: RaceResult = { config: s.config, duration: s.time, results };

@@ -7,7 +7,7 @@ import { WORLDS } from '../src/config/worlds';
 import { GhostPlayer, GhostRecorder } from '../src/game/ghost';
 import { RaceEngine } from '../src/game/raceEngine';
 import { buildParticipants } from '../src/game/setup';
-import { TrackGenerator } from '../src/game/trackGenerator';
+import { poolForRoles, TrackGenerator } from '../src/game/trackGenerator';
 import {
   applyCampaignResult,
   currentLevel,
@@ -20,6 +20,7 @@ import {
   levelRaceConfig,
   starsFromGoals,
   totalStars,
+  unlockRoles,
 } from '../src/progression/campaign';
 import { applyDailyResult, dailyKey, dailyMetric, dailySpec, DAILY_REWARDS, isBetterDaily, refreshDaily } from '../src/progression/daily';
 import { createDefaultProfile, createProfile, MAX_PROFILES } from '../src/progression/profile';
@@ -42,7 +43,7 @@ class MemStore implements StorageLike {
 }
 
 function res(partial: Partial<ParticipantResult> = {}): ParticipantResult {
-  const zero = { raptor: 0, spino: 0, ankylo: 0, trike: 0 };
+  const zero = { raptor: 0, spino: 0, ankylo: 0, trike: 0, ptero: 0 };
   return {
     id: 'p0',
     name: 'Ema',
@@ -61,10 +62,10 @@ function res(partial: Partial<ParticipantResult> = {}): ParticipantResult {
     score: 30,
     caught: false,
     stars: 3,
-    used: { raptor: 300, spino: 300, ankylo: 200, trike: 200 },
+    used: { raptor: 300, spino: 300, ankylo: 200, trike: 200, ptero: 0 },
     segmentsByArchetype: { ...zero, raptor: 3, spino: 3, ankylo: 2, trike: 2 },
     abilitiesUsed: 1,
-    loadout: { raptor: 'raptor-green', spino: 'spino-blue', ankylo: 'ankylo-orange', trike: 'trike-purple' },
+    loadout: { raptor: 'raptor-green', spino: 'spino-blue', ankylo: 'ankylo-orange', trike: 'trike-purple', ptero: 'ptero-sky' },
     ...partial,
   };
 }
@@ -97,18 +98,31 @@ describe('career map', () => {
   });
 
   it('builds every track from the landscape of its place', () => {
+    // roles a child has when a place opens: 2 at the start, then 3, 4 and 5
+    const rolesAt = (l: (typeof CAMPAIGN_LEVELS)[number]) =>
+      l.id === 'jungle-1' || l.id === 'jungle-2'
+        ? ['raptor', 'spino']
+        : l.region === 'jungle'
+          ? ['raptor', 'spino', 'ankylo']
+          : l.region === 'swamp' || l.region === 'canyon'
+            ? ['raptor', 'spino', 'ankylo', 'trike']
+            : ['raptor', 'spino', 'ankylo', 'trike', 'ptero'];
     for (const l of CAMPAIGN_LEVELS) {
-      // every place mixes terrains for at least three different dinosaurs
-      expect(new Set(Object.keys(l.terrainPool).map((t) => TERRAINS[t as keyof typeof TERRAINS].best)).size).toBeGreaterThanOrEqual(3);
+      const roles = rolesAt(l) as ('raptor' | 'spino' | 'ankylo' | 'trike' | 'ptero')[];
+      // a place only uses terrains of dinosaurs the child already has – and at least two of them
+      const bests = new Set(Object.keys(l.terrainPool).map((t) => TERRAINS[t as keyof typeof TERRAINS].best));
+      for (const b of bests) expect(roles).toContain(b);
+      expect(bests.size).toBeGreaterThanOrEqual(2);
       for (const d of ['small', 'racer', 'champion'] as const) {
         const len = levelLength(l, d);
-        const a = new TrackGenerator({ seed: l.seed, worldId: l.world, difficulty: d, length: len, terrainPool: l.terrainPool }).track;
-        const b = new TrackGenerator({ seed: l.seed, worldId: l.world, difficulty: d, length: len, terrainPool: l.terrainPool }).track;
+        const a = new TrackGenerator({ seed: l.seed, worldId: l.world, difficulty: d, length: len, terrainPool: l.terrainPool, roles }).track;
+        const b = new TrackGenerator({ seed: l.seed, worldId: l.world, difficulty: d, length: len, terrainPool: l.terrainPool, roles }).track;
         expect(JSON.stringify(a)).toBe(JSON.stringify(b));
         expect(a.length).toBeGreaterThanOrEqual(len * 0.9);
         const allowed = new Set<string>([...Object.keys(l.terrainPool), WORLDS[l.world].firmTerrain]);
         const evented = new Set(a.segments.filter((s) => s.event).map((s) => s.index));
         for (const sgm of a.segments) if (!evented.has(sgm.index)) expect(allowed.has(sgm.terrain)).toBe(true);
+        for (const sgm of a.segments) expect(roles).toContain(TERRAINS[(sgm.event?.newTerrain ?? sgm.terrain) as keyof typeof TERRAINS].best);
       }
     }
     // the swamp really is muddy and wet, the Ice Age snowy
@@ -422,5 +436,68 @@ describe('profiles', () => {
     expect(MISSION_BY_ID.daily3.metric(p.stats, p)).toBe(2);
     p.stats.ghostsBeaten = 1;
     expect(MISSION_BY_ID.ghost1.metric(p.stats, p)).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('dinosaur roles (2 → 3 → 4 → 5)', () => {
+  it('a new child starts with two roles; milestones on the map add the others', () => {
+    const p = createDefaultProfile(0);
+    expect(p.roles).toEqual(['raptor', 'spino']);
+    p.campaign.stars['jungle-2'] = 1;
+    expect(unlockRoles(p)).toEqual(['ankylo']);
+    p.campaign.stars['jungle-5'] = 1;
+    expect(unlockRoles(p)).toEqual(['trike']);
+    p.campaign.stars['canyon-5'] = 2;
+    expect(unlockRoles(p)).toEqual(['ptero']);
+    expect(p.roles).toEqual(['raptor', 'spino', 'ankylo', 'trike', 'ptero']);
+    expect(unlockRoles(p)).toEqual([]);
+  });
+
+  it('older saves keep the four classic dinosaurs', () => {
+    const store = new MemStore();
+    const prof = createDefaultProfile(0) as unknown as Record<string, unknown>;
+    delete prof.roles;
+    (prof.stats as Record<string, number>).racesFinished = 4;
+    store.setItem(SAVE_KEY, JSON.stringify({ version: 3, profiles: [prof], activeProfileId: prof.id, settings: {} }));
+    expect(loadSave(store).profiles[0].roles).toEqual(['raptor', 'spino', 'ankylo', 'trike']);
+    const fresh = createDefaultProfile(0) as unknown as Record<string, unknown>;
+    delete fresh.roles;
+    store.setItem(SAVE_KEY, JSON.stringify({ version: 3, profiles: [fresh], activeProfileId: fresh.id, settings: {} }));
+    expect(loadSave(store).profiles[0].roles).toEqual(['raptor', 'spino']);
+  });
+
+  it('tracks only use terrains of the available roles', () => {
+    const pool = poolForRoles({ grass: 3, water: 2, stones: 2, mud: 2, chasm: 1 }, ['raptor', 'spino']);
+    expect(Object.keys(pool).sort()).toEqual(['grass', 'water']);
+    for (let seed = 1; seed <= 20; seed++) {
+      const t = new TrackGenerator({ seed, worldId: 'jungle', difficulty: 'racer', roles: ['raptor', 'spino'] }).track;
+      for (const sgm of t.segments) {
+        expect(['raptor', 'spino']).toContain(TERRAINS[sgm.terrain].best);
+        if (sgm.event) expect(['raptor', 'spino']).toContain(TERRAINS[sgm.event.newTerrain].best);
+      }
+    }
+  });
+
+  it('locked roles cannot be chosen and the AI only uses available ones', () => {
+    const cfg = config({ seed: 3, roles: ['raptor', 'spino'] });
+    const e = new RaceEngine(cfg, [human('p0', 0), { ...human('ai0', -1), kind: 'ai', aiProfile: 'beginner' }]);
+    expect(e.requestSwitch('p0', 'ankylo')).toBe(false);
+    const seen = new Set<string>();
+    e.onEvent = (ev) => {
+      if (ev.type === 'switch' && ev.participantId === 'ai0') seen.add(ev.archetype!);
+    };
+    simulate(e, { p0: perfectBot });
+    for (const a of seen) expect(['raptor', 'spino']).toContain(a);
+  });
+
+  it('the flyer is fast over a gorge and slow on the ground', () => {
+    const fly = TERRAINS.chasm.suitability;
+    expect(TERRAINS.chasm.best).toBe('ptero');
+    expect(fly.ptero).toBe('best');
+    expect(['bad', 'awful']).toContain(fly.raptor);
+    expect(['bad', 'awful']).toContain(fly.trike);
+    expect(TERRAINS.water.suitability.ptero).toBe('bad');
+    expect(TERRAINS.grass.suitability.ptero).toBe('ok');
   });
 });

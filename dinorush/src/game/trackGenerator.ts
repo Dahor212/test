@@ -1,4 +1,5 @@
 import { Rng } from '../core/rng';
+import { CLASSIC_ROLES } from '../config/dinosaurs';
 import { DIFFICULTIES } from '../config/difficulty';
 import { GAME_CONFIG } from '../config/gameConfig';
 import { TERRAINS } from '../config/terrain';
@@ -26,10 +27,12 @@ export interface TrackOptions {
   events?: boolean;
   /** Terrain mix override (map locations). */
   terrainPool?: Partial<Record<TerrainId, number>>;
+  /** Dinosaur roles of the race: only terrains for these appear. */
+  roles?: Archetype[];
 }
 
 /** Terrains that are too demanding for the gentle start of a race. */
-const INTRO_EXCLUDED: TerrainId[] = ['deepWater', 'scree', 'ice'];
+const INTRO_EXCLUDED: TerrainId[] = ['deepWater', 'scree', 'ice', 'chasm'];
 
 const EVENT_TERRAIN: Record<DynamicEventType, { terrain: TerrainId; obstacle?: ObstacleKind; count?: number }> = {
   fallingTree: { terrain: 'woodBarrier', obstacle: 'fallenTree', count: 2 },
@@ -39,6 +42,20 @@ const EVENT_TERRAIN: Record<DynamicEventType, { terrain: TerrainId; obstacle?: O
   quake: { terrain: 'scree', obstacle: 'rockPile', count: 3 },
   stoneWall: { terrain: 'stones', obstacle: 'stoneWall', count: 2 },
 };
+
+/**
+ * Keeps only terrains whose best dinosaur is among the race's roles. With
+ * two roles the track is just firm ground and water; every new role adds
+ * its terrains. Falls back to grass and water if too little is left.
+ */
+export function poolForRoles(pool: Partial<Record<TerrainId, number>>, roles: Archetype[]): Partial<Record<TerrainId, number>> {
+  const out: Partial<Record<TerrainId, number>> = {};
+  for (const [id, w] of Object.entries(pool) as [TerrainId, number][]) if (roles.includes(TERRAINS[id].best)) out[id] = w;
+  const bests = new Set(Object.keys(out).map((t) => TERRAINS[t as TerrainId].best));
+  if (!bests.has('raptor')) out.grass = 3;
+  if (bests.size < 2) out.water = (out.water ?? 0) + 3;
+  return out;
+}
 
 export const START_LENGTH_MIN = 55;
 export const FINISH_STRAIGHT = 55;
@@ -58,9 +75,11 @@ export class TrackGenerator {
 
   constructor(opts: TrackOptions) {
     const diff = DIFFICULTIES[opts.difficulty];
+    const roles = opts.roles ?? CLASSIC_ROLES;
     this.opts = {
       ...opts,
-      terrainPool: opts.terrainPool ?? WORLDS[opts.worldId].terrainPool,
+      roles,
+      terrainPool: poolForRoles(opts.terrainPool ?? WORLDS[opts.worldId].terrainPool, roles),
       length: opts.length ?? diff.trackLength,
       endless: opts.endless ?? false,
       coins: opts.coins ?? false,
@@ -266,7 +285,7 @@ export class TrackGenerator {
     while (placed < count && candidates.length) {
       const idx = candidates.splice(this.rng.int(0, candidates.length - 1), 1)[0];
       // try the world's event types in a random order
-      const types = [...this.world.events];
+      const types = this.world.events.filter((t) => this.opts.roles.includes(TERRAINS[EVENT_TERRAIN[t].terrain].best));
       for (let k = types.length - 1; k > 0; k--) {
         const j = this.rng.int(0, k);
         [types[k], types[j]] = [types[j], types[k]];
@@ -282,7 +301,9 @@ export class TrackGenerator {
     const segs = this.track.segments;
     for (let i = Math.max(from, 3); i < segs.length - 1; i++) {
       if (!this.rng.chance(0.09)) continue;
-      const type = this.rng.pick(this.world.events);
+      const types = this.world.events.filter((t) => this.opts.roles.includes(TERRAINS[EVENT_TERRAIN[t].terrain].best));
+      if (!types.length) continue;
+      const type = this.rng.pick(types);
       if (this.eligibleForEvent(i, type)) segs[i].event = this.eventSpec(type, segs[i]);
     }
   }

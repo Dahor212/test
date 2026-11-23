@@ -80,7 +80,8 @@ export function CollectionScreen() {
         <div className="collection-grid">
           {ARCHETYPES.map((a) => (
             <div key={a} className="arch-row">
-              <div className="arch-label" style={{ background: ARCHETYPE_INFO[a].color }}>
+              <div className={'arch-label' + (profile.roles.includes(a) ? '' : ' locked')} style={{ background: ARCHETYPE_INFO[a].color }} title={profile.roles.includes(a) ? '' : 'Odemkne se v Dobrodružství'}>
+                {!profile.roles.includes(a) && <Icon name="lock" size={14} />}
                 {ARCHETYPE_INFO[a].role}
               </div>
               {DINOSAURS.filter((d) => d.archetype === a).map((d) => {

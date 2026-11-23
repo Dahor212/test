@@ -1,6 +1,6 @@
 import { ACCESSORY_BY_ID, DINO_BY_ID } from '../config/dinosaurs';
 import { FOSSILS, LEVEL_BY_ID, REGIONS } from '../config/campaign';
-import { ARCHETYPES } from '../config/dinosaurs';
+import { ARCHETYPES, CLASSIC_ROLES, STARTING_ROLES } from '../config/dinosaurs';
 import { DIFFICULTIES } from '../config/difficulty';
 import { DECORATIONS, PARK_SIZE } from '../config/economy';
 import { MODES } from '../config/modes';
@@ -242,6 +242,11 @@ export function sanitizeProfile(raw: unknown): PlayerProfile {
     badges: strList(cp.badges, (x) => x in REGIONS) as PlayerProfile['campaign']['badges'],
     friends: strList(cp.friends, (x) => !!DINO_BY_ID[x]),
   };
+  // roles: older saves knew all four classic dinosaurs from the start
+  const played = p.stats.racesFinished > 0 || Object.keys(p.campaign.stars).length > 0;
+  const roles = Array.isArray(raw.roles) ? raw.roles.filter((r): r is Archetype => typeof r === 'string' && (ARCHETYPES as string[]).includes(r)) : played ? [...CLASSIC_ROLES] : [...STARTING_ROLES];
+  for (const r of STARTING_ROLES) if (!roles.includes(r)) roles.unshift(r);
+  p.roles = ARCHETYPES.filter((a) => roles.includes(a));
   p.daily = sanitizeDaily(raw.daily);
   p.ghosts = {};
   if (isObj(raw.ghosts)) {
@@ -271,7 +276,7 @@ export function sanitizeGhost(raw: unknown): GhostData | null {
   const arch = typeof raw.arch === 'string' ? raw.arch : '';
   if (!pos || pos.length < 2 || pos.length > 4000 || arch.length !== pos.length) return null;
   if (!pos.every((x) => typeof x === 'number' && Number.isFinite(x))) return null;
-  if (!/^[rsat]+$/.test(arch)) return null;
+  if (!/^[rsatp]+$/.test(arch)) return null;
   const dt = num(raw.dt, 0.5, 0.05, 5);
   const time = num(raw.time, 0, 0, 3600);
   if (time <= 0) return null;

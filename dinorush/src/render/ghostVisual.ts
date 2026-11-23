@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { ARCHETYPES, DINO_BY_ID, STARTER_LINEUP } from '../config/dinosaurs';
 import type { GhostPlayer } from '../game/ghost';
 import type { Archetype, TrackDefinition } from '../types';
-import { animateDino, createDino, type DinoRig } from './dinoModels';
+import { animateDino, createDino, ROLE_MODEL, type DinoRig } from './dinoModels';
 import { terrainPose } from './racerVisual';
 import { nameTagTexture } from './textures';
 import { disposeObject } from './util';
@@ -31,7 +31,7 @@ export class GhostVisual {
     });
     this.rigs = {} as Record<Archetype, DinoRig>;
     for (const a of ARCHETYPES) {
-      const rig = createDino(a, DINO_BY_ID[STARTER_LINEUP[a]].palette, null);
+      const rig = createDino(ROLE_MODEL[a], DINO_BY_ID[STARTER_LINEUP[a]].palette, null);
       rig.root.traverse((o) => {
         const m = o as THREE.Mesh;
         if (!m.isMesh) return;
@@ -51,6 +51,11 @@ export class GhostVisual {
     this.tag.scale.set(1.8, 0.5, 1);
     this.tag.renderOrder = 19;
     this.group.add(this.tag);
+  }
+
+  /** Is the ghost a flyer at race time t? */
+  flying(t: number): boolean {
+    return this.ghost.archAt(t) === 'ptero';
   }
 
   /** Position on the track at race time t (metres). */

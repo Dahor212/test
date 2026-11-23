@@ -77,6 +77,7 @@ export const GAME_CONFIG = {
     firmChargePerMetre: 100 / 140,
     waterChargePerMetre: 100 / 70,
     roughChargePerMetre: 100 / 80,
+    airChargePerMetre: 100 / 45,
     smashChargePerObstacle: 34,
   },
 

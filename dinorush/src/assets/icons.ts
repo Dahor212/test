@@ -85,6 +85,19 @@ const dinoBodies: Record<Archetype, (c: DinoIconColors) => string> = {
       <path d="M90 50 L98 44 L94 54 Z" fill="${c.belly}" stroke-width="2"/>
     </g>
     ${eye(78, 50, 5.5)}`,
+  ptero: (c) => `
+    <g stroke="${c.outline}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M46 52 Q26 30 4 40 Q16 50 22 62 Q34 58 46 60 Z" fill="${c.accent}"/>
+      <path d="M50 52 Q70 24 96 30 Q86 44 82 58 Q66 56 54 60 Z" fill="${c.body}"/>
+      <path d="M52 52 Q60 38 92 32" fill="none" stroke-width="2.5"/>
+      <ellipse cx="48" cy="58" rx="14" ry="9" fill="${c.body}"/>
+      <path d="M40 62 Q48 68 58 62" fill="${c.belly}" stroke="none"/>
+      <path d="M44 66 L40 80 M52 66 L54 80" fill="none" stroke-width="3"/>
+      <path d="M34 48 Q38 36 50 38 Q56 42 52 50 Q42 52 34 48 Z" fill="${c.body}"/>
+      <path d="M36 44 L6 52 L36 50 Z" fill="${c.accent}"/>
+      <path d="M48 38 L66 22 L52 44 Z" fill="${c.accent}"/>
+    </g>
+    ${eye(42, 43, 4.5)}`,
 };
 
 export function dinoIconSvg(arch: Archetype, colors: DinoIconColors): string {
@@ -135,6 +148,11 @@ const terrainArt: Record<string, string> = {
   snow: `<circle cx="50" cy="50" r="46" fill="#9fd3f5"/>
     <g stroke="#fff" stroke-width="6" stroke-linecap="round"><path d="M50 18 V82 M22 34 L78 66 M22 66 L78 34"/></g>
     <g stroke="#fff" stroke-width="4" stroke-linecap="round"><path d="M42 24 L50 32 L58 24 M42 76 L50 68 L58 76"/></g>`,
+  chasm: `<circle cx="50" cy="50" r="46" fill="#a3d8ff"/>
+    <path d="M6 58 L30 58 L38 92 L62 92 L70 58 L94 58 L94 96 L6 96 Z" fill="#8a6f62"/>
+    <path d="M30 58 L38 92 L62 92 L70 58 Z" fill="#3d302c"/>
+    <path d="M10 58 L30 58 M70 58 L90 58" stroke="#5ac85a" stroke-width="6" stroke-linecap="round"/>
+    <path d="M28 36 Q40 26 50 34 Q60 26 72 36" fill="none" stroke="#ff5fa2" stroke-width="6" stroke-linecap="round"/>`,
   ice: `<circle cx="50" cy="50" r="46" fill="#aee7ff"/>
     <path d="M20 30 L80 22 L86 70 L18 78 Z" fill="#d8f5ff" stroke="#4aa3c9" stroke-width="3" stroke-linejoin="round"/>
     <path d="M40 30 L48 50 L36 62 M48 50 L66 56" fill="none" stroke="#4aa3c9" stroke-width="3" stroke-linecap="round"/>

@@ -325,7 +325,7 @@ function LineupStep() {
         </div>
       )}
       <div className="lineup-slots">
-        {ARCHETYPES.map((a) => {
+        {ARCHETYPES.filter((a) => active.roles.includes(a)).map((a) => {
           const def = DINO_BY_ID[lineup[a]];
           const owned = DINOSAURS.filter((d) => d.archetype === a && profile.dinos[d.id]).length;
           const inst = profile.dinos[def.id];

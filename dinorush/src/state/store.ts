@@ -261,7 +261,7 @@ class Store {
     const raceSeed = seed ?? randomSeed();
     this.rememberSetup(setup);
     const participants = buildParticipants(setup, this.state.profile, raceSeed, this.profileById);
-    const config = buildRaceConfig(setup, raceSeed);
+    const config: RaceConfig = { ...buildRaceConfig(setup, raceSeed), roles: this.roles() };
     let ghostKey: string | null = null;
     if (setup.humans === 1 && REPLAY_GHOST_MODES.has(setup.mode)) ghostKey = ghostKeyReplay(raceSeed, setup.worldId, setup.difficulty, setup.mode);
     this.set({
@@ -314,7 +314,7 @@ class Store {
       seatProfiles: cup.seatProfiles ? [...cup.seatProfiles] : undefined,
     };
     const participants = buildParticipants(setup, this.state.profile, cup.baseSeed, this.profileById).map((p) => ({ ...p, name: cup!.names[p.id] ?? p.name }));
-    const config = buildRaceConfig(setup, cupSeed(cup));
+    const config: RaceConfig = { ...buildRaceConfig(setup, cupSeed(cup)), roles: this.roles() };
     this.set({ race: { id: ++this.raceCounter, config, participants, setup, tutorial: false, ghost: null, ghostKey: null }, screen: 'RACE' });
   }
 
@@ -338,7 +338,7 @@ class Store {
       // the region champion races as a named rival
       participants = participants.map((pp) => (pp.id === RIVAL_ID ? { ...pp, name: BOSS_NAMES[level.region].slice(0, 16), color: '#2d3436', aiProfile: 'champion' as const } : pp));
     }
-    const config = levelRaceConfig(level, difficulty);
+    const config: RaceConfig = { ...levelRaceConfig(level, difficulty), roles: this.roles() };
     this.updateProfile((p) => (p.campaign.current = level.id));
     const ghostKey = ghostKeyCampaign(level.id, difficulty);
     this.set({
@@ -355,12 +355,17 @@ class Store {
     const difficulty = profile.campaign.difficulty;
     const setup: RaceSetup = { mode: spec.mode, humans: 1, names: [profileName(profile)], worldId: spec.worldId, difficulty };
     const participants = buildParticipants(setup, profile, spec.seed);
-    const config: RaceConfig = { ...buildRaceConfig(setup, spec.seed), context: { kind: 'daily', key } };
-    const ghostKey = ghostKeyDaily(key, difficulty);
+    const config: RaceConfig = { ...buildRaceConfig(setup, spec.seed), context: { kind: 'daily', key }, roles: this.roles() };
+    const ghostKey = `${ghostKeyDaily(key, difficulty)}:${config.roles!.length}`;
     this.set({
       race: { id: ++this.raceCounter, config, participants, setup, tutorial: false, ghost: profile.ghosts[ghostKey] ?? null, ghostKey },
       screen: 'RACE',
     });
+  }
+
+  /** Dinosaur roles of the active child (2 at the start, up to 5). */
+  private roles() {
+    return [...this.state.profile.roles];
   }
 
   /** Which profile collects the rewards of a seat (guests count for the active child). */
@@ -481,11 +486,11 @@ class Store {
         kind: 'human',
         seat: 0,
         loadout: baseLoadout(),
-        start: 'trike',
+        start: this.state.profile.roles.includes('trike') ? 'trike' : 'spino',
         lane: 2,
       },
     ];
-    const config: RaceConfig = { ...buildRaceConfig(setup, 1, true), tutorial: true };
+    const config: RaceConfig = { ...buildRaceConfig(setup, 1, true), tutorial: true, roles: this.roles() };
     this.set({
       race: { id: ++this.raceCounter, config, participants, setup, tutorial: true, ghost: null, ghostKey: null },
       screen: 'TUTORIAL',

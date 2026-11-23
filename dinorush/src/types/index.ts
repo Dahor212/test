@@ -9,16 +9,16 @@
 // ---------------------------------------------------------------------------
 
 /** The four base archetypes. Every lineup must contain exactly one of each. */
-export type Archetype = 'raptor' | 'spino' | 'ankylo' | 'trike';
+export type Archetype = 'raptor' | 'spino' | 'ankylo' | 'trike' | 'ptero';
 
-export type AbilityId = 'superSprint' | 'waterWave' | 'unstoppableSmash' | 'unstoppableAdvance';
+export type AbilityId = 'superSprint' | 'waterWave' | 'unstoppableSmash' | 'unstoppableAdvance' | 'skyGlide';
 
 export interface DinosaurAbility {
   id: AbilityId;
   name: string;
   description: string;
   /** How the ability charges. */
-  chargeSource: 'firmDistance' | 'waterDistance' | 'smash' | 'roughDistance';
+  chargeSource: 'firmDistance' | 'waterDistance' | 'smash' | 'roughDistance' | 'airDistance';
   /** Terrain categories where the ability can fire. */
   activeOn: TerrainCategory[];
   /** Speed multiplier while active. */
@@ -56,7 +56,8 @@ export type ModelId =
   | 'pachy'
   | 'trike'
   | 'styraco'
-  | 'brachio';
+  | 'brachio'
+  | 'pteranodon';
 
 export interface DinosaurDefinition {
   id: string;
@@ -110,9 +111,10 @@ export type TerrainId =
   | 'sand'
   | 'snow'
   | 'ice'
-  | 'bridge';
+  | 'bridge'
+  | 'chasm';
 
-export type TerrainCategory = 'firm' | 'water' | 'smash' | 'rough';
+export type TerrainCategory = 'firm' | 'water' | 'smash' | 'rough' | 'air';
 
 export type ObstacleKind = 'rockPile' | 'woodWall' | 'boulder' | 'fallenTree' | 'iceBlock' | 'stoneWall';
 
@@ -435,6 +437,8 @@ export interface RaceConfig {
   terrainPool?: Partial<Record<TerrainId, number>>;
   /** Look of a map location: sky, fog, light and weather on top of the world. */
   look?: WorldLook;
+  /** Dinosaur roles available in this race (default: the classic four). */
+  roles?: Archetype[];
 }
 
 export type WorldLook = Partial<Pick<WorldDefinition, 'sky' | 'fog' | 'fogNear' | 'fogFar' | 'ambient' | 'sun' | 'sunIntensity' | 'ground' | 'ground2' | 'weather'>>;
@@ -742,6 +746,8 @@ export interface PlayerProfile {
   tutorialDone: boolean;
   lastSetup: RaceSetup | null;
   campaign: CampaignState;
+  /** Dinosaur roles this child can use (2 at the start, up to 5). */
+  roles: Archetype[];
   daily: DailyState;
   ghosts: Record<string, GhostData>;
 }

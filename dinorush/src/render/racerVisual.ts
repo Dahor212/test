@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { ARCHETYPES, ARCHETYPE_INFO, DINO_BY_ID, STARTER_LINEUP } from '../config/dinosaurs';
 import { TERRAINS } from '../config/terrain';
 import type { Archetype, RaceParticipant, TerrainId } from '../types';
-import { animateDino, createDino, type DinoAnimMode, type DinoRig } from './dinoModels';
+import { animateDino, createDino, ROLE_MODEL, type DinoAnimMode, type DinoRig } from './dinoModels';
 import type { Particles } from './particles';
 import { nameTagTexture } from './textures';
 import { basicMat, clamp01, disposeObject, easeOutBack, GEO, mesh } from './util';
@@ -11,6 +11,9 @@ import { basicMat, clamp01, disposeObject, easeOutBack, GEO, mesh } from './util
 export function terrainPose(arch: Archetype, terrain: TerrainId, hip: number): { mode: DinoAnimMode; sink: number } {
   const t = TERRAINS[terrain];
   const best = t.best === arch;
+  // the flyer always flies; in a gorge the walkers climb down and up
+  if (arch === 'ptero') return { mode: 'run', sink: 0 };
+  if (t.category === 'air') return { mode: 'climb', sink: 0 };
   if (terrain === 'bridge') return { mode: 'run', sink: -0.62 };
   switch (t.category) {
     case 'water': {
@@ -34,6 +37,8 @@ export function terrainPose(arch: Archetype, terrain: TerrainId, hip: number): {
 export class RacerVisual {
   readonly group = new THREE.Group();
   readonly rigs: Record<Archetype, DinoRig>;
+  /** Model scale of each rig (the flyer is drawn larger). */
+  private base = {} as Record<Archetype, number>;
   private ring: THREE.Mesh;
   private shadow: THREE.Mesh;
   private tag: THREE.Sprite;
@@ -54,8 +59,9 @@ export class RacerVisual {
     for (const a of ARCHETYPES) {
       const lo = p.loadout[a];
       const def = DINO_BY_ID[lo.defId] ?? DINO_BY_ID[STARTER_LINEUP[a]];
-      const rig = createDino(def.model ?? def.archetype, def.palette, lo.accessory);
+      const rig = createDino(def.model ?? ROLE_MODEL[def.archetype], def.palette, lo.accessory);
       rig.root.visible = a === p.current;
+      this.base[a] = rig.root.scale.x;
       if (castShadows) rig.root.traverse((o) => (o.castShadow = true));
       this.rigs[a] = rig;
       this.group.add(rig.root);
@@ -88,7 +94,7 @@ export class RacerVisual {
     this.transformT = 0;
     const rig = this.rigs[to];
     rig.root.visible = true;
-    rig.root.scale.setScalar(0.01);
+    rig.root.scale.setScalar(0.01 * this.base[to]);
     const c = new THREE.Color(ARCHETYPE_INFO[to].color).getHex();
     (this.flash.material as THREE.MeshBasicMaterial).color.setHex(c);
     this.flash.visible = true;
@@ -106,11 +112,12 @@ export class RacerVisual {
       if (this.previous) {
         const old = this.rigs[this.previous];
         const s = Math.max(0.01, 1 - clamp01(t / 0.45));
-        old.root.scale.set(s, s * (1 + (1 - s) * 0.4), s);
+        const b = this.base[this.previous];
+        old.root.scale.set(s * b, s * (1 + (1 - s) * 0.4) * b, s * b);
         if (t >= 0.45) old.root.visible = false;
       }
       const ns = Math.max(0.01, easeOutBack(clamp01((t - 0.15) / 0.85)));
-      this.rigs[this.current].root.scale.setScalar(ns);
+      this.rigs[this.current].root.scale.setScalar(ns * this.base[this.current]);
       const fm = this.flash.material as THREE.MeshBasicMaterial;
       fm.opacity = Math.max(0, 0.6 * (1 - t));
       this.flash.scale.setScalar(0.8 + t * 1.8);
