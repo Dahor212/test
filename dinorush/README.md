@@ -50,6 +50,21 @@ npm run e2e          # build + 21 end-to-end testů v Chromiu (Playwright)
 
 Produkční verzi lze v síti spustit stejně: `npm run build && npm run preview` a pak na tabletu otevřít `http://<IP>:4173/`.
 
+## 2b. Online verze (GitHub Pages)
+
+Sestavená hra je v repozitáři ve složce `dinorush-hra/` (větev `main`). Pokud má repozitář zapnuté GitHub Pages
+(Settings → Pages → Deploy from a branch → `main` / `(root)`), hraje se na adrese:
+
+**https://dahor212.github.io/test/dinorush-hra/**
+
+Aktualizace online verze po změně kódu:
+
+```bash
+cd dinorush && npm run build && cd ..
+rm -rf dinorush-hra && cp -r dinorush/dist dinorush-hra
+git add dinorush-hra && git commit -m "Aktualizace DinoRUSH" && git push
+```
+
 ## 3. Produkční verze
 
 ```bash
