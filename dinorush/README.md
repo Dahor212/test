@@ -27,7 +27,7 @@ npm run dev          # vývojový server (http://localhost:5173 + adresa v síti
 Další příkazy:
 
 ```bash
-npm test             # 85 unit testů herní logiky (Vitest)
+npm test             # 87 unit testů herní logiky (Vitest)
 npm run build        # typová kontrola + produkční build do dist/
 npm run preview      # spuštění produkčního buildu (http://localhost:4173)
 npm run e2e          # build + 25 end-to-end testů v Chromiu (Playwright)
@@ -109,7 +109,7 @@ dinorush/
 │  │  ├─ worlds.ts                 # 4 světy (pool terénů, události, barvy, mlha, světla)
 │  │  ├─ difficulty.ts             # 3 obtížnosti + profily AI
 │  │  ├─ modes.ts                  # 6 herních režimů + pravidla poháru
-│  │  ├─ campaign.ts               # Dobrodružství: 24 úrovní ve 4 světech, cíle hvězd, T-Rex bossové
+│  │  ├─ campaign.ts               # kariéra: 6 oblastí × 5 míst na mapě, krajina tratí, cíle hvězd, fosilie, úrovně průzkumníka
 │  │  ├─ economy.ts                # odměny, XP úrovně, ceny vylepšení, sekvence vajíček, dekorace
 │  │  └─ missions.ts               # úkoly (podmínka = funkce nad statistikami)
 │  ├─ core/rng.ts                  # deterministický seedovaný generátor
@@ -127,7 +127,9 @@ dinorush/
 │  │                               #   campaign.ts (hvězdy, odemykání), daily.ts (denní výzva)
 │  ├─ render/                      # 3D VYKRESLOVÁNÍ (jen čte stav enginu)
 │  │  ├─ creature.ts               # „modelovací dílna“: plynulá těla (loft), kostra, šupinatá kůže, klouby
-│  │  ├─ dinoModels.ts             # Velociraptor, Spinosaurus, Ankylosaurus, Triceratops, T-Rex, Ptéro + animace chůze/plavání
+│  │  ├─ dinoKit.ts                # společná dílna dinosaurů: kostra, kůže, oči, zuby, svalnaté nohy, ruce
+│  │  ├─ dinoModels.ts             # Velociraptor, Spinosaurus/Baryonyx, Ankylosaurus, Triceratops/Styracosaurus, T-Rex, Ptéro + animace
+│  │  ├─ species.ts                # Gallimimus, Dilophosaurus, Stegosaurus, Pachycephalosaurus, Brachiosaurus
 │  │  ├─ trackPath.ts              # zatáčející stezka (vzdálenost → 3D poloha), údolí, řeky a jezera
 │  │  ├─ terrainArt.ts             # ručně „malované“ přírodní textury terénů (bez obrázků) v jednom texture array
 │  │  ├─ trail.ts                  # jedna souvislá stezka: plynulé přechody terénů, měkké okraje, pěna u vody
@@ -180,17 +182,18 @@ dinorush/
 - Generátor tratí se seedem: stejný seed znamená stejnou trať („HRÁT ZNOVU“ ji zopakuje). Začíná snadnými úseky a hlídá minimální délku úseku, takže reakce je vždy fyzicky možná (ověřeno testy pro všechny světy a obtížnosti).
 - **Jedna společná stezka**: všech pět dinosaurů běží po jedné přírodní cestě jako smečka (volně se vlní a v zatáčkách nadbíhají dovnitř). Terény do sebe plynule přecházejí (tráva s vyšlapanou cestičkou, mokrý břeh s pěnou u vody), okraje stezky se nepravidelně ztrácejí v trávě a lemují je trsy trávy, kamínky a kytky. Překážka (kmen, zeď, balvany, ledové bloky) vede přes celou šířku cesty a každý ji prorazí tam, kde běží. Dinosauři i stromy vrhají skutečné stíny, na obloze plují mraky.
 - **Trať vede krajinou**: plynule zatáčející stezka údolím mezi kopci. Řeka protéká napříč celým údolím (rákosí, lekníny, kameny na březích), bahno je bažina, písek duny, led zamrzlé jezero, sníh sněžné pole a most vede přes řeku (v sopkách přes lávu). Kamera jede za posledním lidským hráčem, natáčí se se zatáčkami a při větším rozestupu hráčů se oddálí. Skutečné pořadí ukazuje tabulka vlevo nahoře (ikona aktuálního dinosaura a odstup v metrech) a ukazatel postupu tratí nahoře.
-- **Dinosauři připomínají skutečné druhy**: plynulé tělo s ohýbajícím se krkem a ocasem, svalnaté nohy s klouby, prsty a drápy, čelisti se zuby, oči se zornicí a šupinatá kůže se vzorem. Velociraptor má srpovitý dráp a pírka na rukou, Spinosaurus krokodýlí čenich, plachtu s ostny a veslovitý ocas, Ankylosaurus pancíř z kostěných destiček, boční ostny a palici, Triceratops velkou hlavu se zobákem, tři rohy a límec s ozdobným lemem.
+- **Dinosauři připomínají skutečné druhy**: plynulé tělo s ohýbajícím se krkem a ocasem, mohutná svalnatá stehna zapuštěná do těla, štíhlé běháky s lýtkem a tříprsté nohy s drápy (dvounožci), sloupovité nohy s polštáři a nehty (čtyřnožci), čelisti se zuby, oči se zornicí a šupinatá kůže se vzorem. **19 dinosaurů v 11 druzích**: Velociraptor, Gallimimus a Dilophosaurus (RYCHLÍCI), Spinosaurus a Baryonyx (PLAVCI), Ankylosaurus, Stegosaurus a Pachycephalosaurus (BOURÁCI), Triceratops, Styracosaurus a Brachiosaurus (TEREŇÁCI). Každý nový druh má vlastní model (ploténky a bodce stegosaura, kopule tvrdohlavce, dlouhý krk brachiosaura, bodcovitý límec styracosaura, hřebínky dilophosaura…) a vlastní malý bonus.
 
 **Režimy (6)**: Klasický závod · Dino pohár (5 závodů ve 4 světech, body 10/7/5/3/1, průběžná tabulka, finále s odměnou, uložená historie, pokračování po restartu) · Útěk před T-Rexem (skutečná vzdálenost T-Rexe, hravé předběhnutí, hvězdičky) · Nekonečná výprava (postupná trať, zrychlování, skóre, ukončení a uložení rekordu) · Zlatá horečka (mince za správné úseky, perfektní proměny, komba a zlaté úseky; vítězí nejvíc mincí) · Týmový závod (společné skóre, týmové turbo, porazit létajícího Ptéra = časový limit).
 
 **Multiplayer na jednom tabletu**: v závodě je vždy 5 dinosaurů: 1 hráč + 4 AI, 2 hráči + 3 AI, 3 hráči + 2 AI. Ovládací panely jsou rozložené zleva doprava, každý má jméno, barvu, medaili s pořadím, kombo, ukazatel rychlosti (zelený / oranžový / červený podle toho, jak dinosaurus sedí na terén), kartu „teď / další terén“ s odpočtem a velká tlačítka dinosaurů (jeden hráč 1×4, víc hráčů 2×2) s ukazatelem nabití schopnosti. Pointer Events zvládají víc současných dotyků. V soutěžním multiplayeru se RPG statistiky normalizují.
 
-**Progrese**: mince a XP po každém závodě (rozpis odměn). 10 úrovní dinosaurů. Vylepšení RYCHLOST / PROMĚNA / VÝDRŽ za mince (5 stupňů, podmíněno úrovní, každé má měřitelný vliv). Sbírka s 3D náhledy, 12 dinosaurů (4 základní a 8 variant se sólo perky) a 5 doplňků (čepička, brýle, korunka, šála, kytička), které jsou vidět i ve 3D. Sestavení aktivní čtveřice (vždy pokrývá všechny 4 schopnosti). Vajíčko po každých 3 závodech podle předvídatelné sekvence, s animací třesení, prasklin, rozlomení a odhalení. Dino Park 5×4 ve 3D s nákupem 10 dekorací, umístěním, přesunem, uklizením a dinosaury, kteří se procházejí. 16 automaticky vyhodnocovaných úkolů a rekordy.
+**Progrese**: mince a XP po každém závodě (rozpis odměn). 10 úrovní dinosaurů. Vylepšení RYCHLOST / PROMĚNA / VÝDRŽ za mince (5 stupňů, podmíněno úrovní, každé má měřitelný vliv). Sbírka s 3D náhledy, 19 dinosaurů (4 základní, 8 barevných variant a 7 nových druhů, všichni kromě základních se sólo perky) a 5 doplňků (čepička, brýle, korunka, šála, kytička), které jsou vidět i ve 3D. Sestavení aktivní čtveřice (vždy pokrývá všechny 4 schopnosti). Vajíčko po každých 3 závodech podle předvídatelné sekvence, s animací třesení, prasklin, rozlomení a odhalení. Dino Park 5×4 ve 3D s nákupem 10 dekorací, umístěním, přesunem, uklizením a dinosaury, kteří se procházejí. 16 automaticky vyhodnocovaných úkolů a rekordy.
 
 **Dlouhodobá motivace**
 - **Profily hráčů („Kdo hraje?“)**: až 4 děti na jednom tabletu. Každé má vlastní jméno, avatara (dinosaurus + barva), mince, dinosaury, park, úkoly, hvězdy a duchy. Při spuštění s více profily se hra nejdřív zeptá, kdo hraje. Ve společném závodě si na 2. a 3. místo lze vybrat jiný profil (závodí se svými dinosaury a odměny dostane do svého profilu) nebo hosta.
-- **Dobrodružství (mapa)**: 4 světy po 6 úrovních s pevnými tratěmi. Úrovně kombinují klasický závod, zlatou horečku a útěk před T-Rexem. Na konci každého světa je **T-Rex boss** (větší, se jménem, rychlejší), jehož poražení odemkne další svět a dá vajíčko a 100 mincí. Každá úroveň má 3 hvězdy za konkrétní cíle (např. „Doběhni do 3. místa“, „Vyhraj“, „Kombo 6×“, „Nejvýš 2 chyby“). První cíl je podmínkou postupu. Za každou novou hvězdu je 20 mincí. Obtížnost dobrodružství si každý profil volí sám. Síla soupeřů a rychlost T-Rexe byly vyladěné simulací: průměrný „dětský“ bot (asi 75 % správných voleb, pozdní reakce) projde na obtížnosti Dino závodník bosse v 30–80 % pokusů, perfektní hráč má všude 3 hvězdy.
+- **Dobrodružství = kariéra na mapě**: velký ilustrovaný ostrov se šesti oblastmi: Pravěký prales, Mlžné bažiny, Písečný kaňon, Sopečné údolí, Ledová doba a Dinosauří ostrovy. Má 30 míst spojených cestami, které se za pralesem větví, a hráčův avatar po mapě putuje. **Trať se odvíjí od místa**: každé místo má vlastní směs terénů (bažiny = bahno a voda, kaňon = písek, suť a skály, Ledová doba = sníh a led, Lávové mosty = mosty nad lávou), vlastní oblohu, mlhu a počasí (v bažinách prší, v Ledové době sněží). Karta místa ukazuje, jaké terény na trati čekají. Každé místo má 3 hvězdy za konkrétní cíle a na konci oblasti je boss: obří T-Rex se jménem, nebo pojmenovaný šampion oblasti, kterého je třeba předběhnout.
+- **RPG prvky v dětském stylu**: *úroveň průzkumníka* (Vajíčko → Mládě → Průzkumník → Stopař → Závodník → Šampion → Dino legenda) za zkušenosti z kariéry, s odměnou za každou novou úroveň (mince, vajíčka). Na sedmi místech hráč *potká nového dinosaura*, který se k němu po doběhnutí přidá do sbírky. Za 3 hvězdy na místě *najde fosilii* (24 fosilií: zub T-Rexe, jantar s komárem, amonit…). Za poraženého bosse dostane *odznak oblasti*. Odznaky, kamarády i fosilie má v *batohu*. Dřívější postup v Dobrodružství se zachoval.
 - **Denní výzva**: každý den jedna nová trať (střídají se světy i režimy), stejná pro všechny. Za první dokončení dne +50 mincí, za 3 hvězdy +30. **Rodinná tabulka** ukazuje dnešní nejlepší výsledky všech profilů. Žádné série: vynechaný den nic nebere.
 - **Duch vlastního rekordu**: hra zaznamená tvoji nejlepší jízdu na úrovni dobrodružství a v denní výzvě (a i u „HRÁT ZNOVU“ na stejné trati). Při dalším pokusu běží vedle tebe průsvitný dinosaurus „Duch“, na ukazateli postupu je jeho značka a v panelu odstup v metrech. Ve výsledcích se ukáže, o kolik sekund jsi ducha porazil(a).
 - 4 nové úkoly: Hvězdný dobrodruh, Krotitel T-Rexe, Denní závodník, Rychlejší než duch.
@@ -201,10 +204,10 @@ dinorush/
 
 ## 7. Testy
 
-- `npm test`: 85 unit testů. Pokrývají determinismus a validitu tratí pro všechny světy a obtížnosti, násobiče rychlosti, cooldown, perfektní proměnu (i to, že dřívější reakce nezpomalí), kombo, schopnosti, překážky, pořadí v cíli, přesnost a sílu AI, délku závodů 90–150 s, všech 6 režimů, normalizaci v multiplayeru, odměny, vylepšení, vajíčka, park, úkoly, pohár, ukládání (včetně poškozených dat a migrace).
+- `npm test`: 87 unit testů. Pokrývají determinismus a validitu tratí pro všechny světy a obtížnosti, násobiče rychlosti, cooldown, perfektní proměnu (i to, že dřívější reakce nezpomalí), kombo, schopnosti, překážky, pořadí v cíli, přesnost a sílu AI, délku závodů 90–150 s, všech 6 režimů, normalizaci v multiplayeru, odměny, vylepšení, vajíčka, park, úkoly, pohár, ukládání (včetně poškozených dat a migrace).
 - `npm run e2e`: 25 scénářů v Chromiu. Odpovídají testům 1–20 ze zadání a navíc testují tutoriál, dobrodružství (hvězdy, odemčení, uložení), ducha, denní výzvu s rodinnou tabulkou a profily (nový hráč, společný závod s odměnami pro oba, výběr hráče po spuštění). Používají skutečné dotyky přes CDP, včetně tří prstů najednou, emulaci iPadu, simulaci přechodu na pozadí a offline režim. Výsledek: `e2e/out/report.md` a screenshoty v `e2e/out/`.
 
-Poslední běh: **85/85 unit testů a 25/25 E2E scénářů prošlo.**
+Poslední běh: **87/87 unit testů a 25/25 E2E scénářů prošlo.**
 
 ## 8. Omezení první verze
 

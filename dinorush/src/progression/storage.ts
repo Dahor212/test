@@ -1,5 +1,5 @@
 import { ACCESSORY_BY_ID, DINO_BY_ID } from '../config/dinosaurs';
-import { LEVEL_BY_ID } from '../config/campaign';
+import { FOSSILS, LEVEL_BY_ID, REGIONS } from '../config/campaign';
 import { ARCHETYPES } from '../config/dinosaurs';
 import { DIFFICULTIES } from '../config/difficulty';
 import { DECORATIONS, PARK_SIZE } from '../config/economy';
@@ -224,10 +224,23 @@ export function sanitizeProfile(raw: unknown): PlayerProfile {
   };
   const cp = isObj(raw.campaign) ? raw.campaign : {};
   const stars: Record<string, number> = {};
-  if (isObj(cp.stars)) for (const [k, v] of Object.entries(cp.stars)) if (LEVEL_BY_ID[k]) stars[k] = Math.round(num(v, 0, 0, 3));
+  if (isObj(cp.stars)) {
+    for (const [k, v] of Object.entries(cp.stars)) {
+      // the first adventure had six levels per world; its boss "…-6" is now "…-5"
+      const old6 = /^(jungle|volcano|ice|islands)-6$/.exec(k);
+      const id = old6 ? `${old6[1]}-5` : k;
+      if (LEVEL_BY_ID[id]) stars[id] = Math.max(stars[id] ?? 0, Math.round(num(v, 0, 0, 3)));
+    }
+  }
+  const strList = (v: unknown, ok: (x: string) => boolean) => (Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === 'string' && ok(x)))] : []);
   p.campaign = {
     difficulty: typeof cp.difficulty === 'string' && cp.difficulty in DIFFICULTIES ? (cp.difficulty as PlayerProfile['campaign']['difficulty']) : 'racer',
     stars,
+    current: typeof cp.current === 'string' && LEVEL_BY_ID[cp.current] ? cp.current : null,
+    xp: Math.floor(num(cp.xp, 0, 0, 1e7)),
+    fossils: strList(cp.fossils, (x) => x in FOSSILS),
+    badges: strList(cp.badges, (x) => x in REGIONS) as PlayerProfile['campaign']['badges'],
+    friends: strList(cp.friends, (x) => !!DINO_BY_ID[x]),
   };
   p.daily = sanitizeDaily(raw.daily);
   p.ghosts = {};

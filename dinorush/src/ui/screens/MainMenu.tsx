@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { ARCHETYPES } from '../../config/dinosaurs';
 import { sound } from '../../audio/sound';
 import { DinoStage } from '../../render/stage';
-import { MAX_STARS, totalStars } from '../../progression/campaign';
+import { explorerTitle, MAX_STARS, totalStars } from '../../progression/campaign';
 import { dailyKey } from '../../progression/daily';
 import { profileName } from '../../progression/profile';
 import { store, useApp } from '../../state/store';
@@ -110,7 +110,7 @@ export function MainMenu() {
           <Button color="green" size="lg" icon="map" onClick={() => store.go('CAMPAIGN')} testId="nav-campaign" className="side-action">
             Dobrodružství
             <small className="action-sub">
-              <Icon name="star" size={16} /> {totalStars(profile)}/{MAX_STARS}
+              <Icon name="star" size={16} /> {totalStars(profile)}/{MAX_STARS} · {explorerTitle(profile.campaign.xp)}
             </small>
           </Button>
           <Button color="orange" size="xl" icon="play" onClick={() => store.startSetup()} testId="play" className="play-btn">

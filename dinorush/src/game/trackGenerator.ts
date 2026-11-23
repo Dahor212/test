@@ -24,6 +24,8 @@ export interface TrackOptions {
   endless?: boolean;
   coins?: boolean;
   events?: boolean;
+  /** Terrain mix override (map locations). */
+  terrainPool?: Partial<Record<TerrainId, number>>;
 }
 
 /** Terrains that are too demanding for the gentle start of a race. */
@@ -58,6 +60,7 @@ export class TrackGenerator {
     const diff = DIFFICULTIES[opts.difficulty];
     this.opts = {
       ...opts,
+      terrainPool: opts.terrainPool ?? WORLDS[opts.worldId].terrainPool,
       length: opts.length ?? diff.trackLength,
       endless: opts.endless ?? false,
       coins: opts.coins ?? false,
@@ -143,7 +146,7 @@ export class TrackGenerator {
     const wantChange = this.rng.chance(intro ? 1 : this.diff.changeProbability);
     const pool: Partial<Record<TerrainId, number>> = {};
     const recentBest = new Set<Archetype>(this.recent.slice(-2).map((t) => TERRAINS[t].best));
-    for (const [id, w] of Object.entries(this.world.terrainPool) as [TerrainId, number][]) {
+    for (const [id, w] of Object.entries(this.opts.terrainPool) as [TerrainId, number][]) {
       if (id === prev) continue;
       if (intro && INTRO_EXCLUDED.includes(id)) continue;
       const best = TERRAINS[id].best;
@@ -155,7 +158,7 @@ export class TrackGenerator {
     }
     if (Object.keys(pool).length === 0) {
       // fall back to any terrain needing a different dino
-      for (const [id, w] of Object.entries(this.world.terrainPool) as [TerrainId, number][]) {
+      for (const [id, w] of Object.entries(this.opts.terrainPool) as [TerrainId, number][]) {
         if (id !== prev && TERRAINS[id].best !== prevBest) pool[id] = w;
       }
     }

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { sound } from '../audio/sound';
-import { CAMPAIGN_REWARDS, LEVEL_BY_ID } from '../config/campaign';
+import { BOSS_NAMES, CAMPAIGN_REWARDS, LEVEL_BY_ID, RIVAL_ID } from '../config/campaign';
 import { randomSeed } from '../core/rng';
 import { ghostKeyCampaign, ghostKeyDaily, ghostKeyReplay } from '../game/ghost';
 import { buildParticipants, buildRaceConfig } from '../game/setup';
@@ -333,8 +333,13 @@ class Store {
     if (!level || !isUnlocked(profile, level)) return;
     const difficulty = profile.campaign.difficulty;
     const setup: RaceSetup = { mode: level.mode, humans: 1, names: [profileName(profile)], worldId: level.world, difficulty };
-    const participants = buildParticipants(setup, profile, level.seed, undefined, levelAiProfiles(level, difficulty));
+    let participants = buildParticipants(setup, profile, level.seed, undefined, levelAiProfiles(level, difficulty));
+    if (level.boss && level.bossKind === 'rival') {
+      // the region champion races as a named rival
+      participants = participants.map((pp) => (pp.id === RIVAL_ID ? { ...pp, name: BOSS_NAMES[level.region].slice(0, 16), color: '#2d3436', aiProfile: 'champion' as const } : pp));
+    }
     const config = levelRaceConfig(level, difficulty);
+    this.updateProfile((p) => (p.campaign.current = level.id));
     const ghostKey = ghostKeyCampaign(level.id, difficulty);
     this.set({
       race: { id: ++this.raceCounter, config, participants, setup, tutorial: false, ghost: profile.ghosts[ghostKey] ?? null, ghostKey },
@@ -417,10 +422,13 @@ class Store {
         sum.totalCoins += amount;
       };
       if (main && ctx?.kind === 'campaign') {
-        campaign = applyCampaignResult(p, ctx.levelId, main, result.config.mode) ?? undefined;
+        campaign = applyCampaignResult(p, ctx.levelId, main, result.config.mode, result.results) ?? undefined;
         if (campaign) {
-          addLine(`Nové hvězdy (${campaign.newStars})`, campaign.newStars * CAMPAIGN_REWARDS.perStar);
-          addLine('Poražený T-Rex boss', campaign.coins - campaign.newStars * CAMPAIGN_REWARDS.perStar);
+          const starCoins = campaign.newStars * CAMPAIGN_REWARDS.perStar;
+          const bossCoins = campaign.bossFirstWin ? CAMPAIGN_REWARDS.bossCoins : 0;
+          addLine(`Nové hvězdy (${campaign.newStars})`, starCoins);
+          addLine(LEVEL_BY_ID[ctx.levelId]?.bossKind === 'rival' ? 'Poražený šampion' : 'Poražený T-Rex boss', bossCoins);
+          addLine('Nová úroveň průzkumníka', campaign.coins - starCoins - bossCoins);
           sum.eggsEarned += campaign.eggs;
         }
       }

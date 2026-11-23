@@ -403,6 +403,10 @@ export class WorldScenery {
       this.weatherTimer = 0;
       const k = 8 + Math.random() * 40;
       particles.emit('snow', cx + fwd.x * k + (Math.random() - 0.5) * 36, 6, cz + fwd.z * k + (Math.random() - 0.5) * 36, { count: 2 });
+    } else if (this.world.weather === 'rain' && this.weatherTimer > 0.03) {
+      this.weatherTimer = 0;
+      const k = 6 + Math.random() * 30;
+      particles.emit('splash', cx + fwd.x * k + (Math.random() - 0.5) * 30, 9, cz + fwd.z * k + (Math.random() - 0.5) * 30, { count: 1, color: 0xbfe9ff, scale: 0.6 });
     } else if (this.world.weather === 'sparkle' && this.weatherTimer > 0.2) {
       this.weatherTimer = 0;
       const k = 20 + Math.random() * 50;

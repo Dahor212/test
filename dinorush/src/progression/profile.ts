@@ -84,7 +84,7 @@ export function createDefaultProfile(now = Date.now()): PlayerProfile {
     cupHistory: [],
     tutorialDone: false,
     lastSetup: null,
-    campaign: { difficulty: 'racer', stars: {} },
+    campaign: { difficulty: 'racer', stars: {}, current: null, xp: 0, fossils: [], badges: [], friends: [] },
     daily: emptyDaily(),
     ghosts: {},
   };

@@ -82,6 +82,7 @@ export class RaceEngine {
           endless: config.mode === 'endless',
           coins: this.mode.trackCoins,
           length: config.trackLengthOverride,
+          terrainPool: config.terrainPool,
         });
         t = this.generator.track;
       }

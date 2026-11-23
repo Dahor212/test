@@ -66,6 +66,14 @@ export const EGG_SEQUENCE: EggReward[] = [
   { kind: 'accessory', id: 'crown' },
   { kind: 'dino', id: 'trike-rainbow' },
   { kind: 'accessory', id: 'flower' },
+  // newer species – usually met earlier on the career map
+  { kind: 'dino', id: 'galli-sand' },
+  { kind: 'dino', id: 'stego-forest' },
+  { kind: 'dino', id: 'bary-river' },
+  { kind: 'dino', id: 'styraco-desert' },
+  { kind: 'dino', id: 'dilo-jungle' },
+  { kind: 'dino', id: 'pachy-rock' },
+  { kind: 'dino', id: 'brachio-ice' },
 ];
 
 export const DECORATIONS: Record<DecorationId, ParkDecoration> = {

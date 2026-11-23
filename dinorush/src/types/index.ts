@@ -44,11 +44,27 @@ export interface DinoPalette {
   effect?: 'none' | 'sparkle' | 'rainbow' | 'frost' | 'gold';
 }
 
+/** 3D model (species body plan); several dinosaurs can share one. */
+export type ModelId =
+  | 'raptor'
+  | 'gallimimus'
+  | 'dilophosaurus'
+  | 'spino'
+  | 'baryonyx'
+  | 'ankylo'
+  | 'stego'
+  | 'pachy'
+  | 'trike'
+  | 'styraco'
+  | 'brachio';
+
 export interface DinosaurDefinition {
   id: string;
   name: string;
   species: string;
   archetype: Archetype;
+  /** Species model; defaults to the archetype's classic dinosaur. */
+  model?: ModelId;
   /** Short role label e.g. RYCHLÍK. */
   role: string;
   palette: DinoPalette;
@@ -192,7 +208,7 @@ export interface WorldDefinition {
   ground2: number;
   /** UI card gradient. */
   cardColors: [string, string];
-  weather?: 'none' | 'smoke' | 'snow' | 'sparkle';
+  weather?: 'none' | 'smoke' | 'snow' | 'sparkle' | 'rain';
 }
 
 // ---------------------------------------------------------------------------
@@ -415,7 +431,13 @@ export interface RaceConfig {
   boss?: string;
   /** Where the race comes from (campaign level, daily challenge). */
   context?: RaceContext;
+  /** Terrain mix of a map location (replaces the world's default pool). */
+  terrainPool?: Partial<Record<TerrainId, number>>;
+  /** Look of a map location: sky, fog, light and weather on top of the world. */
+  look?: WorldLook;
 }
+
+export type WorldLook = Partial<Pick<WorldDefinition, 'sky' | 'fog' | 'fogNear' | 'fogFar' | 'ambient' | 'sun' | 'sunIntensity' | 'ground' | 'ground2' | 'weather'>>;
 
 export type RaceContext = { kind: 'campaign'; levelId: string } | { kind: 'daily'; key: string };
 
@@ -601,7 +623,7 @@ export interface Avatar {
   color: string;
 }
 
-export type GoalKind = 'place' | 'escape' | 'lead' | 'perfects' | 'combo' | 'smash' | 'mistakes';
+export type GoalKind = 'place' | 'escape' | 'lead' | 'perfects' | 'combo' | 'smash' | 'mistakes' | 'rival';
 
 /** One star goal; the first goal of a level is the pass condition. */
 export interface StarGoal {
@@ -611,28 +633,68 @@ export interface StarGoal {
 
 export type CampaignMode = 'classic' | 'goldRush' | 'trex';
 
+export type RegionId = 'jungle' | 'swamp' | 'canyon' | 'volcano' | 'ice' | 'islands';
+
+export interface RegionDefinition {
+  id: RegionId;
+  name: string;
+  subtitle: string;
+  /** 3D world used for the races (scenery set). */
+  world: WorldId;
+  terrainPool: Partial<Record<TerrainId, number>>;
+  look?: WorldLook;
+  /** Map colours. */
+  colors: [string, string];
+  badge: string;
+}
+
+export type FossilId = string;
+
+/** One place on the career map (a race). */
 export interface CampaignLevel {
   id: string;
+  region: RegionId;
   world: WorldId;
-  /** 0-based index within the world. */
+  /** 0-based index within the region. */
   index: number;
-  /** 1-based number over the whole campaign. */
+  /** 1-based number over the whole map. */
   number: number;
   title: string;
   mode: CampaignMode;
   boss: boolean;
+  /** Boss flavour: run from a T-Rex or beat a rival champion. */
+  bossKind?: 'trex' | 'rival';
+  /** Dinosaur met here (joins on the first pass). */
+  friend?: string;
+  /** Fossil found for three stars. */
+  fossil?: FossilId;
+  /** Position on the map (0–1000 × 0–700). */
+  x: number;
+  y: number;
+  /** Places this one is reached from (open when one of them has a star). */
+  from: string[];
   /** Track length for the 'racer' difficulty (scaled for the others). */
   length: number;
   ai: 'easy' | 'normal' | 'hard';
   trexFactor: number;
   seed: number;
+  terrainPool: Partial<Record<TerrainId, number>>;
+  look?: WorldLook;
   goals: [StarGoal, StarGoal, StarGoal];
 }
 
 export interface CampaignState {
   difficulty: DifficultyId;
-  /** Best stars per level id (0–3). */
+  /** Best stars per place id (0–3). */
   stars: Record<string, number>;
+  /** Where the explorer stands on the map. */
+  current: string | null;
+  /** Explorer experience (career races). */
+  xp: number;
+  fossils: FossilId[];
+  badges: RegionId[];
+  /** Dinosaur ids met on the map. */
+  friends: string[];
 }
 
 export interface DailyState {

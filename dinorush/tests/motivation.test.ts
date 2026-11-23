@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { CAMPAIGN_LEVELS, CAMPAIGN_REWARDS, goalText, LEVEL_BY_ID, LEVELS_PER_WORLD } from '../src/config/campaign';
+import { CAMPAIGN_LEVELS, CAMPAIGN_REWARDS, EXPLORER_LEVELS, goalText, LEVEL_BY_ID, LEVELS_PER_REGION, REGION_LIST, RIVAL_ID } from '../src/config/campaign';
 import { DIFFICULTIES } from '../src/config/difficulty';
 import { MISSION_BY_ID } from '../src/config/missions';
-import { WORLD_IDS } from '../src/config/worlds';
+import { TERRAINS } from '../src/config/terrain';
+import { WORLDS } from '../src/config/worlds';
 import { GhostPlayer, GhostRecorder } from '../src/game/ghost';
 import { RaceEngine } from '../src/game/raceEngine';
 import { buildParticipants } from '../src/game/setup';
@@ -10,9 +11,10 @@ import { TrackGenerator } from '../src/game/trackGenerator';
 import {
   applyCampaignResult,
   currentLevel,
+  explorerLevel,
   goalsMet,
+  isRegionUnlocked,
   isUnlocked,
-  isWorldUnlocked,
   levelAiProfiles,
   levelLength,
   levelRaceConfig,
@@ -68,60 +70,95 @@ function res(partial: Partial<ParticipantResult> = {}): ParticipantResult {
 }
 
 // ---------------------------------------------------------------------------
-describe('adventure campaign', () => {
-  it('has 4 worlds × 6 levels with a T-Rex boss at the end of each world', () => {
-    expect(CAMPAIGN_LEVELS).toHaveLength(WORLD_IDS.length * LEVELS_PER_WORLD);
+describe('career map', () => {
+  it('has six regions × five places with a boss at the end of each region', () => {
+    expect(REGION_LIST).toHaveLength(6);
+    expect(CAMPAIGN_LEVELS).toHaveLength(REGION_LIST.length * LEVELS_PER_REGION);
     expect(new Set(CAMPAIGN_LEVELS.map((l) => l.id)).size).toBe(CAMPAIGN_LEVELS.length);
     expect(new Set(CAMPAIGN_LEVELS.map((l) => l.seed)).size).toBe(CAMPAIGN_LEVELS.length);
     CAMPAIGN_LEVELS.forEach((l, i) => {
       expect(l.number).toBe(i + 1);
-      expect(l.boss).toBe(l.index === LEVELS_PER_WORLD - 1);
-      if (l.boss) expect(l.mode).toBe('trex');
+      expect(l.boss).toBe(l.index === LEVELS_PER_REGION - 1);
       expect(l.goals).toHaveLength(3);
       for (const g of l.goals) expect(goalText(g).length).toBeGreaterThan(3);
+      expect(l.x).toBeGreaterThan(0);
+      expect(l.x).toBeLessThan(1000);
+      expect(l.y).toBeGreaterThan(0);
+      expect(l.y).toBeLessThan(700);
     });
+    // every place is reachable from the start along the paths
+    const reach = new Set<string>([CAMPAIGN_LEVELS[0].id]);
+    for (let k = 0; k < 40; k++) for (const l of CAMPAIGN_LEVELS) if (l.from.some((f) => reach.has(f))) reach.add(l.id);
+    expect(reach.size).toBe(CAMPAIGN_LEVELS.length);
+    for (const l of CAMPAIGN_LEVELS) for (const f of l.from) expect(LEVEL_BY_ID[f]).toBeDefined();
+    // seven new dinosaurs can be met on the way; every friend is a real dinosaur
+    const friends = CAMPAIGN_LEVELS.filter((l) => l.friend).map((l) => l.friend!);
+    expect(new Set(friends).size).toBe(7);
   });
 
-  it('generates a valid fixed track of the configured length for every level and difficulty', () => {
+  it('builds every track from the landscape of its place', () => {
     for (const l of CAMPAIGN_LEVELS) {
+      // every place mixes terrains for at least three different dinosaurs
+      expect(new Set(Object.keys(l.terrainPool).map((t) => TERRAINS[t as keyof typeof TERRAINS].best)).size).toBeGreaterThanOrEqual(3);
       for (const d of ['small', 'racer', 'champion'] as const) {
         const len = levelLength(l, d);
-        const a = new TrackGenerator({ seed: l.seed, worldId: l.world, difficulty: d, length: len }).track;
-        const b = new TrackGenerator({ seed: l.seed, worldId: l.world, difficulty: d, length: len }).track;
+        const a = new TrackGenerator({ seed: l.seed, worldId: l.world, difficulty: d, length: len, terrainPool: l.terrainPool }).track;
+        const b = new TrackGenerator({ seed: l.seed, worldId: l.world, difficulty: d, length: len, terrainPool: l.terrainPool }).track;
         expect(JSON.stringify(a)).toBe(JSON.stringify(b));
         expect(a.length).toBeGreaterThanOrEqual(len * 0.9);
-        expect(a.segments[0].start).toBe(0);
+        const allowed = new Set<string>([...Object.keys(l.terrainPool), WORLDS[l.world].firmTerrain]);
+        const evented = new Set(a.segments.filter((s) => s.event).map((s) => s.index));
+        for (const sgm of a.segments) if (!evented.has(sgm.index)) expect(allowed.has(sgm.terrain)).toBe(true);
       }
     }
+    // the swamp really is muddy and wet, the Ice Age snowy
+    const count = (id: string, kinds: string[]) => {
+      const l = LEVEL_BY_ID[id];
+      const t = new TrackGenerator({ seed: l.seed, worldId: l.world, difficulty: 'racer', length: levelLength(l, 'racer'), terrainPool: l.terrainPool }).track;
+      return t.segments.filter((s) => kinds.includes(s.terrain)).length / t.segments.length;
+    };
+    expect(count('swamp-1', ['mud', 'water', 'deepWater'])).toBeGreaterThan(0.35);
+    expect(count('ice-2', ['snow', 'ice'])).toBeGreaterThan(0.3);
+    expect(levelRaceConfig(LEVEL_BY_ID['swamp-1'], 'racer').look?.weather).toBe('rain');
   });
 
   it('evaluates star goals; the first goal is the pass condition', () => {
     const l = LEVEL_BY_ID['jungle-1']; // place ≤ 3, win, perfects
     expect(goalsMet(l.goals, res({ place: 1, perfects: 5 }), 'classic')).toEqual([true, true, true]);
     expect(starsFromGoals(goalsMet(l.goals, res({ place: 2, perfects: 0 }), 'classic'))).toBe(1);
-    // place 4 fails the level even when the perfect-switch goal is met
     expect(starsFromGoals(goalsMet(l.goals, res({ place: 4, perfects: 9 }), 'classic'))).toBe(0);
-    const boss = LEVEL_BY_ID['jungle-6']; // escape, lead, mistakes
+    const boss = LEVEL_BY_ID['jungle-5']; // escape, lead, mistakes
     expect(starsFromGoals(goalsMet(boss.goals, res({ caught: true, finishTime: null }), 'trex'))).toBe(0);
     expect(starsFromGoals(goalsMet(boss.goals, res({ score: 5, mistakes: 0 }), 'trex'))).toBe(2);
     expect(starsFromGoals(goalsMet(boss.goals, res({ score: 40, mistakes: 1 }), 'trex'))).toBe(3);
+    // rival boss: beat the named champion
+    const rival = LEVEL_BY_ID['swamp-5'];
+    const champion = res({ id: RIVAL_ID, kind: 'ai', place: 2 });
+    expect(goalsMet(rival.goals, res({ place: 1 }), 'classic', [champion])[0]).toBe(true);
+    expect(goalsMet(rival.goals, res({ place: 3 }), 'classic', [champion])[0]).toBe(false);
   });
 
-  it('unlocks levels one by one and worlds after their boss', () => {
+  it('opens places along the paths and splits after the jungle', () => {
     const p = createDefaultProfile(0);
-    expect(isUnlocked(p, CAMPAIGN_LEVELS[0])).toBe(true);
-    expect(isUnlocked(p, CAMPAIGN_LEVELS[1])).toBe(false);
+    expect(isUnlocked(p, LEVEL_BY_ID['jungle-1'])).toBe(true);
+    expect(isUnlocked(p, LEVEL_BY_ID['jungle-2'])).toBe(false);
     expect(currentLevel(p).id).toBe('jungle-1');
     applyCampaignResult(p, 'jungle-1', res({ place: 3, perfects: 0 }), 'classic');
-    expect(isUnlocked(p, CAMPAIGN_LEVELS[1])).toBe(true);
-    expect(currentLevel(p).id).toBe('jungle-2');
-    expect(isWorldUnlocked(p, 'volcano')).toBe(false);
-    for (let i = 2; i <= 5; i++) p.campaign.stars[`jungle-${i}`] = 1;
-    const out = applyCampaignResult(p, 'jungle-6', res({ score: 30 }), 'trex')!;
+    expect(isUnlocked(p, LEVEL_BY_ID['jungle-2'])).toBe(true);
+    expect(p.campaign.current).toBe('jungle-1');
+    for (let i = 2; i <= 4; i++) p.campaign.stars[`jungle-${i}`] = 1;
+    expect(isRegionUnlocked(p, 'swamp')).toBe(false);
+    const out = applyCampaignResult(p, 'jungle-5', res({ score: 30 }), 'trex')!;
     expect(out.bossFirstWin).toBe(true);
-    expect(out.unlockedWorld).toBe('volcano');
-    expect(isWorldUnlocked(p, 'volcano')).toBe(true);
-    expect(currentLevel(p).id).toBe('volcano-1');
+    expect(out.badge).toBe('jungle');
+    expect(['swamp', 'canyon']).toContain(out.unlockedWorld);
+    expect(isRegionUnlocked(p, 'swamp')).toBe(true);
+    expect(isRegionUnlocked(p, 'canyon')).toBe(true);
+    expect(isRegionUnlocked(p, 'ice')).toBe(false);
+    expect(isRegionUnlocked(p, 'volcano')).toBe(false);
+    // the islands open from the Ice Age or from the volcano
+    p.campaign.stars['volcano-5'] = 1;
+    expect(isRegionUnlocked(p, 'islands')).toBe(true);
   });
 
   it('pays only for new stars and the boss reward only once', () => {
@@ -136,33 +173,56 @@ describe('adventure campaign', () => {
     const c = applyCampaignResult(p, 'jungle-1', res({ place: 1, perfects: 4 }), 'classic')!;
     expect(c.newStars).toBe(2);
     expect(p.campaign.stars['jungle-1']).toBe(3);
-    // a worse run never lowers the stars
     applyCampaignResult(p, 'jungle-1', res({ place: 5 }), 'classic');
     expect(p.campaign.stars['jungle-1']).toBe(3);
     expect(totalStars(p)).toBe(3);
-    for (let i = 2; i <= 5; i++) p.campaign.stars[`jungle-${i}`] = 1;
-    const eggs = p.eggs.pending;
-    applyCampaignResult(p, 'jungle-6', res({ score: 30 }), 'trex');
-    applyCampaignResult(p, 'jungle-6', res({ score: 30 }), 'trex');
-    expect(p.eggs.pending - eggs).toBe(CAMPAIGN_REWARDS.bossEggs);
+    for (let i = 2; i <= 4; i++) p.campaign.stars[`jungle-${i}`] = 1;
+    const badges = p.campaign.badges.length;
+    applyCampaignResult(p, 'jungle-5', res({ score: 30 }), 'trex');
+    applyCampaignResult(p, 'jungle-5', res({ score: 30 }), 'trex');
+    expect(p.campaign.badges.length - badges).toBe(1);
   });
 
-  it('ramps AI strength and boss T-Rex speed', () => {
+  it('gives explorer XP, levels with rewards, fossils and new dinosaur friends', () => {
+    const p = createDefaultProfile(0);
+    expect(explorerLevel(0)).toBe(1);
+    expect(explorerLevel(EXPLORER_LEVELS[2].xp)).toBe(3);
+    // three stars on the first place: XP for the finish and three new stars, plus its fossil
+    const a = applyCampaignResult(p, 'jungle-1', res({ place: 1, perfects: 5 }), 'classic')!;
+    expect(a.xp).toBe(10 + 3 * 20);
+    expect(a.fossil).toBe(LEVEL_BY_ID['jungle-1'].fossil);
+    expect(p.campaign.fossils).toContain(a.fossil);
+    expect(a.levelAfter).toBe(2); // 70 XP → Mládě
+    // the Dilophosaurus place: the friend joins on the first pass and is playable
+    p.campaign.stars['jungle-2'] = 1;
+    expect(p.dinos['dilo-jungle']).toBeUndefined();
+    const f = applyCampaignResult(p, 'jungle-3', res({ place: 2, perfects: 0, maxCombo: 0 }), 'goldRush')!;
+    expect(f.friend).toBe('dilo-jungle');
+    expect(p.dinos['dilo-jungle']).toBeDefined();
+    expect(p.campaign.friends).toEqual(['dilo-jungle']);
+    const again = applyCampaignResult(p, 'jungle-3', res({ place: 2, perfects: 0, maxCombo: 0 }), 'goldRush')!;
+    expect(again.friend).toBeNull();
+    // a repeated run still gives a little XP, but never coins for old stars
+    expect(again.xp).toBe(10);
+  });
+
+  it('ramps AI strength, uses rival champions and fast boss T-Rexes', () => {
     const first = LEVEL_BY_ID['jungle-1'];
-    const boss = LEVEL_BY_ID['jungle-6'];
+    const boss = LEVEL_BY_ID['jungle-5'];
     expect(levelAiProfiles(first, 'racer').every((p) => p === 'rookie')).toBe(true);
     expect(levelAiProfiles(boss, 'racer')).toContain('champion');
-    expect(levelAiProfiles(LEVEL_BY_ID['jungle-3'], 'racer')).toEqual(DIFFICULTIES.racer.aiProfiles);
+    expect(levelAiProfiles(LEVEL_BY_ID['jungle-4'], 'racer')).toEqual(DIFFICULTIES.racer.aiProfiles);
     const cfg = levelRaceConfig(boss, 'racer');
     expect(cfg.trexFactor).toBeGreaterThan(1);
     expect(cfg.boss).toBeTruthy();
-    expect(cfg.context).toEqual({ kind: 'campaign', levelId: 'jungle-6' });
+    expect(cfg.context).toEqual({ kind: 'campaign', levelId: 'jungle-5' });
     const e = new RaceEngine(cfg, [human('p0', 0)]);
     expect(e.state.trex!.speed).toBeCloseTo(DIFFICULTIES.racer.baseSpeed * DIFFICULTIES.racer.trexSpeedFactor * cfg.trexFactor!, 5);
+    expect(levelRaceConfig(LEVEL_BY_ID['canyon-5'], 'racer').boss).toBeUndefined();
   });
 
-  it('a skilled player earns all three stars on the first level and the first boss', () => {
-    for (const id of ['jungle-1', 'jungle-6']) {
+  it('a skilled player earns all three stars on the first place and the first boss', () => {
+    for (const id of ['jungle-1', 'jungle-5', 'swamp-1']) {
       const l = LEVEL_BY_ID[id];
       const profile = createDefaultProfile(0);
       const setup = { mode: l.mode, humans: 1 as const, names: ['K'], worldId: l.world, difficulty: 'racer' as const };
@@ -170,8 +230,20 @@ describe('adventure campaign', () => {
       const e = new RaceEngine(levelRaceConfig(l, 'racer'), parts);
       simulate(e, { p0: perfectBot });
       const r = e.getResult().results.find((x) => x.id === 'p0')!;
-      expect(starsFromGoals(goalsMet(l.goals, r, l.mode))).toBe(3);
+      expect(starsFromGoals(goalsMet(l.goals, r, l.mode, e.getResult().results))).toBe(3);
     }
+  });
+
+  it('keeps stars from the first adventure version', () => {
+    const store = new MemStore();
+    const prof = createDefaultProfile(0) as unknown as Record<string, unknown>;
+    prof.campaign = { difficulty: 'small', stars: { 'jungle-1': 3, 'jungle-5': 1, 'jungle-6': 2, 'nope-1': 3 } };
+    store.setItem(SAVE_KEY, JSON.stringify({ version: 3, profiles: [prof], activeProfileId: prof.id, settings: {} }));
+    const c = loadSave(store).profiles[0].campaign;
+    expect(c.stars).toEqual({ 'jungle-1': 3, 'jungle-5': 2 });
+    expect(c.difficulty).toBe('small');
+    expect(c.xp).toBe(0);
+    expect(c.friends).toEqual([]);
   });
 });
 
@@ -296,7 +368,7 @@ describe('profiles', () => {
     expect(s.profiles.map((p) => p.players[0].name)).toEqual(['Ema', 'Ben']);
     expect(s.activeProfileId).toBe(b.id);
     expect(s.profiles[1].coins).toBe(900);
-    expect(s.profiles[1].campaign).toEqual({ difficulty: 'champion', stars: { 'jungle-1': 3 } });
+    expect(s.profiles[1].campaign).toMatchObject({ difficulty: 'champion', stars: { 'jungle-1': 3 } });
     expect(s.profiles[0].avatar).toEqual({ archetype: 'raptor', color: '#ff4757' });
     // duplicate ids / unknown active id / too many profiles
     const dup = { ...JSON.parse(JSON.stringify(a)) };

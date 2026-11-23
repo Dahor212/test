@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { goalIcon, goalText, LEVEL_BY_ID } from '../../config/campaign';
+import { EXPLORER_LEVELS, FOSSILS, goalIcon, goalText, LEVEL_BY_ID, REGIONS } from '../../config/campaign';
 import { ARCHETYPE_INFO, DINO_BY_ID } from '../../config/dinosaurs';
-import { WORLDS } from '../../config/worlds';
 import { dailySpec, formatDailyValue } from '../../progression/daily';
 import { MODES } from '../../config/modes';
 import { sound } from '../../audio/sound';
@@ -106,11 +105,38 @@ export function ResultsScreen() {
                   <Icon name="star" size={24} className="star-on" /> Nové hvězdy: +{camp.newStars}
                 </div>
               )}
-              {camp.unlockedWorld && (
-                <div className="lr-new world">
-                  <Icon name="map" size={24} /> Odemčen nový svět: {WORLDS[camp.unlockedWorld].name}!
-                </div>
-              )}
+              <div className="lr-rewards">
+                {camp.xp > 0 && (
+                  <span className="lr-chip xp">
+                    <Icon name="bolt" size={18} /> +{camp.xp} zkušeností
+                  </span>
+                )}
+                {camp.levelAfter > camp.levelBefore && (
+                  <span className="lr-chip level" data-testid="explorer-levelup">
+                    <Icon name="star" size={18} /> Nová úroveň: {EXPLORER_LEVELS[camp.levelAfter - 1].title}!
+                  </span>
+                )}
+                {camp.friend && (
+                  <span className="lr-chip friend" data-testid="friend-joined">
+                    <Icon name="heart" size={18} /> Nový kamarád: {DINO_BY_ID[camp.friend].name} ({DINO_BY_ID[camp.friend].species})
+                  </span>
+                )}
+                {camp.fossil && (
+                  <span className="lr-chip fossil">
+                    <Icon name={FOSSILS[camp.fossil].icon} size={18} /> Fosilie: {FOSSILS[camp.fossil].name}
+                  </span>
+                )}
+                {camp.badge && (
+                  <span className="lr-chip badge">
+                    <Icon name="trophy" size={18} /> {REGIONS[camp.badge].badge}!
+                  </span>
+                )}
+                {camp.unlockedWorld && (
+                  <span className="lr-chip world">
+                    <Icon name="map" size={18} /> Otevřena nová oblast: {REGIONS[camp.unlockedWorld].name}!
+                  </span>
+                )}
+              </div>
             </div>
           )}
           {daily && dspec && (

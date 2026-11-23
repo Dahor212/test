@@ -71,7 +71,8 @@ export class RaceRenderer {
     container.appendChild(this.renderer.domElement);
     this.camera = new THREE.PerspectiveCamera(50, 2, 0.5, 700);
     const s = engine.state;
-    const world = WORLDS[s.config.worldId];
+    // a map location may tint the sky, fog and light and bring its own weather
+    const world = { ...WORLDS[s.config.worldId], ...(s.config.look ?? {}) };
     const lights = applyWorldLighting(this.scene, world);
     this.sun = lights.sun;
     if (this.shadows) {

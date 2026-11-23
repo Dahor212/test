@@ -54,7 +54,7 @@ export class RacerVisual {
     for (const a of ARCHETYPES) {
       const lo = p.loadout[a];
       const def = DINO_BY_ID[lo.defId] ?? DINO_BY_ID[STARTER_LINEUP[a]];
-      const rig = createDino(a, def.palette, lo.accessory);
+      const rig = createDino(def.model ?? def.archetype, def.palette, lo.accessory);
       rig.root.visible = a === p.current;
       if (castShadows) rig.root.traverse((o) => (o.castShadow = true));
       this.rigs[a] = rig;

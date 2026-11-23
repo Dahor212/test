@@ -165,7 +165,7 @@ export const MISSIONS: MissionDefinition[] = [
     description: 'Poraz prvního T-Rex bosse v Dobrodružství',
     icon: 'trex',
     target: 1,
-    metric: (_s, p) => ((p.campaign.stars['jungle-6'] ?? 0) > 0 ? 1 : 0),
+    metric: (_s, p) => ((p.campaign.stars['jungle-5'] ?? 0) > 0 ? 1 : 0),
     reward: { coins: 100 },
   },
   {

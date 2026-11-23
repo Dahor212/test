@@ -569,12 +569,14 @@ async function main() {
 
     // ------------------------------------------- extra: long-term motivation
     const { page: p5, ctx: c5 } = await newPage(browser, { timescale: 12 });
-    await test(22, 'Dobrodružství: mapa, úroveň, hvězdy a odemčení další úrovně', async () => {
+    await test(22, 'Kariéra na mapě: místo, krajina trati, hvězdy, zkušenosti a odemčení cesty', async () => {
       await p5.getByTestId('nav-campaign').click({ force: true });
       await p5.getByTestId('campaign').waitFor();
       assert(await p5.getByTestId('level-jungle-2').isDisabled(), 'level 2 locked at start');
       await p5.getByTestId('level-jungle-1').click({ force: true });
       await p5.getByTestId('level-card').waitFor();
+      const terrains = await p5.getByTestId('level-terrains').textContent();
+      assert(terrains.includes('Tráva'), 'place shows its landscape: ' + terrains);
       await p5.getByTestId('start-level').click({ force: true });
       await p5.waitForFunction(() => window.__race && window.__race.engine && window.__race.engine.state.config.context?.levelId === 'jungle-1', null, { timeout: 30000 });
       await startBot(p5, ['p0']);
@@ -590,7 +592,9 @@ async function main() {
       await p5.waitForFunction(() => !!window.__dinorush);
       const kept = await p5.evaluate(() => window.__dinorush.store.get().profile.campaign.stars['jungle-1']);
       assert(kept === stars, 'stars saved ' + kept);
-      return `úroveň 1: ${stars} ★, úroveň 2 odemčena, hvězdy uložené i po obnovení stránky`;
+      const career = await p5.evaluate(() => window.__dinorush.store.get().profile.campaign);
+      assert(career.xp > 0 && career.current === 'jungle-1', 'explorer XP and position ' + JSON.stringify(career));
+      return `místo 1: ${stars} ★, místo 2 odemčeno, +${career.xp} zkušeností, hvězdy uložené i po obnovení stránky`;
     });
     await test(23, 'Duch vlastního rekordu', async () => {
       await p5.evaluate(() => window.__dinorush.store.finishTutorialOffer(true));
