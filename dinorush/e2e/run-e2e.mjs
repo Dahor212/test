@@ -27,7 +27,11 @@ function record(id, name, pass, detail = '') {
   console.log(`${pass ? 'PASS' : 'FAIL'}  T${id} ${name}${detail ? '  — ' + detail : ''}`);
 }
 
+/** E2E_ONLY=18,19 runs only the listed scenarios (shared setup still runs). */
+const ONLY = process.env.E2E_ONLY ? new Set(process.env.E2E_ONLY.split(',').map(Number)) : null;
+
 async function test(id, name, fn) {
+  if (ONLY && !ONLY.has(id)) return;
   try {
     const detail = await fn();
     record(id, name, true, detail ?? '');
@@ -479,6 +483,7 @@ async function main() {
     await test(18, 'Ovládání na tabletu v landscape (iPad emulace)', async () => {
       const dev = devices['iPad Pro 11 landscape'] || devices['iPad (gen 7) landscape'];
       const { page, ctx } = await newPage(browser, { device: dev, timescale: 1 });
+      try {
       await startRace(page, solo, 1234);
       // software WebGL at device pixel ratio 2 draws only ~1–2 frames/s here and the
       // loop clamps a frame to 0.1 s, so the countdown needs real time (a real iPad runs 60 fps)
@@ -502,15 +507,19 @@ async function main() {
       await page.waitForTimeout(200);
       const notice = await page.evaluate(() => getComputedStyle(document.querySelector('.rotate-notice')).display);
       assert(notice !== 'none', 'portrait notice');
-      await ctx.close();
       return `${m.vw}×${m.vh}, 3D ${(100 * m.view / m.vh).toFixed(0)} % výšky, tlačítko ${Math.round(m.btnW)}×${Math.round(m.btnH)} px, portrait → výzva k otočení`;
+      } finally {
+        // a failed check must not leave a heavy page rendering for the next scenarios
+        await ctx.close();
+      }
     });
 
     // ---------------------------------------------------------- T19 background
     await test(19, 'Pozastavení při přechodu na pozadí', async () => {
       const { page, ctx } = await newPage(browser, { timescale: 1 });
+      try {
       await startRace(page, solo, 99);
-      await page.waitForFunction(() => window.__race.engine.state.phase === 'racing' && window.__race.engine.state.time > 1, null, { timeout: 20000 });
+      await page.waitForFunction(() => window.__race.engine.state.phase === 'racing' && window.__race.engine.state.time > 1, null, { timeout: 60000 });
       const setVis = (v) =>
         page.evaluate((v) => {
           Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => v });
@@ -529,8 +538,10 @@ async function main() {
       await page.waitForTimeout(50);
       const t2 = await page.evaluate(() => window.__race.engine.state.time);
       assert(t2 - t1 < 0.25, 'no big jump after resume: ' + (t2 - t1));
-      await ctx.close();
       return `čas závodu stál (${t0.toFixed(2)} s), po návratu pauza, skok po obnovení ${(t2 - t1).toFixed(3)} s`;
+      } finally {
+        await ctx.close();
+      }
     });
 
     // ---------------------------------------------------------- T20 offline PWA
