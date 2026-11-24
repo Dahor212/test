@@ -682,7 +682,7 @@ export function applyWorldLighting(
   scene.background = new THREE.Color(world.fog);
   const skyTint = new THREE.Color(world.ambient).lerp(new THREE.Color(world.sky.top), 0.25);
   const storm = world.weather === 'storm';
-  const dim = (time === 'night' ? 0.62 : time === 'sunset' ? 0.85 : 1) * (storm ? 0.8 : 1);
+  const dim = (time === 'night' ? 0.62 : time === 'sunset' ? 0.74 : 1) * (storm ? 0.8 : 1);
   const hemi = new THREE.HemisphereLight(skyTint, world.ground, (world.id === 'volcano' ? 2.0 : 1.55) * dim);
   const sun = new THREE.DirectionalLight(world.sun, world.sunIntensity * 1.15);
   const offset = sunOffsetFor(time);

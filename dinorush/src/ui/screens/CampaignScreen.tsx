@@ -4,6 +4,7 @@ import { DINO_BY_ID } from '../../config/dinosaurs';
 import { DIFFICULTY_LIST } from '../../config/difficulty';
 import { MODES } from '../../config/modes';
 import { TERRAINS } from '../../config/terrain';
+import { skyLabel } from '../../config/timeOfDay';
 import { ghostKeyCampaign } from '../../game/ghost';
 import {
   currentLevel,
@@ -221,6 +222,12 @@ function LevelCard({ level, onClose }: { level: CampaignLevel; onClose: () => vo
               <small>{TERRAINS[t].name}</small>
             </span>
           ))}
+          {skyLabel(level.look) && (
+            <span className="lc-t lc-sky" data-testid="level-sky">
+              <Icon name={skyLabel(level.look)!.icon} size={30} />
+              <small>{skyLabel(level.look)!.name}</small>
+            </span>
+          )}
         </div>
         <GoalList goals={level.goals} text={goalText} icon={goalIcon} />
         <div className="lc-extras">

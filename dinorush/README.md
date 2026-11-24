@@ -27,7 +27,7 @@ npm run dev          # vývojový server (http://localhost:5173 + adresa v síti
 Další příkazy:
 
 ```bash
-npm test             # 94 unit testů herní logiky (Vitest)
+npm test             # 100 unit testů herní logiky (Vitest)
 npm run build        # typová kontrola + produkční build do dist/
 npm run preview      # spuštění produkčního buildu (http://localhost:4173)
 npm run e2e          # build + 26 end-to-end testů v Chromiu (Playwright)
@@ -108,6 +108,7 @@ dinorush/
 │  │  ├─ terrain.ts                # registr terénů (vhodnost dinosaurů) a překážek
 │  │  ├─ worlds.ts                 # 4 světy (pool terénů, události, barvy, mlha, světla)
 │  │  ├─ difficulty.ts             # 3 obtížnosti + 5 profilů AI (Mládě → Šampion)
+│  │  ├─ timeOfDay.ts              # denní doba (den, západ slunce, noc) a bouřka: barvy oblohy, mlhy a světla
 │  │  ├─ modes.ts                  # 6 herních režimů + pravidla poháru
 │  │  ├─ campaign.ts               # kariéra: 6 oblastí × 5 míst na mapě, krajina tratí, cíle hvězd, fosilie, úrovně průzkumníka,
 │  │  │                            #   milníky odemykání dinosaurů, level design míst (styl tratě, hlavní terén)
@@ -140,6 +141,8 @@ dinorush/
 │  │  │                            #   počasí, osvětlení (slunce, obloha, kontrasvětlo)
 │  │  ├─ backdrop.ts               # obloha se sluncem (shader), mraky, pásma hor v oparu, dominanty krajiny
 │  │  ├─ wildlife.ts               # život v pozadí: stáda brachiosaurů a hejna ptakoještěrů (instancované)
+│  │  ├─ gait.ts                   # krok s pevně stojícími chodidly: opora/švih, inverzní kinematika nohou
+│  │  ├─ podium.ts                 # 3D stupně vítězů s oslavujícími dinosaury a konfetami (výsledky)
 │  │  ├─ raceRenderer.ts           # scéna, kamera jedoucí za dinosaury, efekty z událostí
 │  │  ├─ racerVisual.ts            # závodník: 5 modelů, proměna, aura schopnosti, prach/cákance, let nad propastí
 │  │  ├─ ghostVisual.ts            # průsvitný duch předchozí nejlepší jízdy
@@ -174,6 +177,8 @@ dinorush/
 **Závod a mechaniky**
 - 3D závod **pěti dinosaurů** (1–3 lidští hráči + počítačoví soupeři do počtu pěti) na jedné společné stezce se stejnou tratí pro všechny.
 - Odpočet 3–2–1–START, automatický pohyb, startovní a cílová brána, cílová rovinka, výsledky podle skutečných časů.
+- **Zpomalený průjezd cílem**: když poslední lidský hráč dobíhá do cíle, čas se na chvíli zpomalí na čtvrtinu, objeví se filmové pruhy, kamera se postaví vedle cílové brány a z jejích sloupů vystřelí konfety. Výsledky závodu to nemění (simulace běží s pevným krokem, jen jich za sekundu proběhne méně).
+- **Stupně vítězů ve 3D**: ve výsledcích stojí první tři dinosauři na stupních, vítěz radostně skáče, druhý a třetí se občas přidají a padají konfety. Bez WebGL se ukážou obrázky jako dřív.
 - 5 archetypů (RYCHLÍK, PLAVEC, BOURÁK, TEREŇÁK a LETEC) s odlišnými modely a animacemi (běh, plavání, brodění, klouzání, šplhání, náraz, let, oslava) a proměna jedním dotykem s efektem (0,4 s) a cooldownem 0,3 s. Letec (Pteranodon) přeletí **propast**, hluboký skalní kaňon přes celé údolí, do kterého ostatní dinosauři musí pomalu slézt a zase vylézt.
 - Výpočet rychlosti: základ (podle obtížnosti) × vhodnost terénu (správný 1,15 / použitelný 0,72 / špatný 0,45 / úplně nevhodný 0,32) × bonusy (perfektní proměna, turbo komba, týmové turbo, schopnost) × RPG (max. +12 %). Plynulé zrychlení i zpomalení, minimální rychlost, takže nikdo nikdy neuvízne. Špatně zvolený dinosaurus je tak zhruba 2,5–3,5× pomalejší než ten správný a soupeři s dobrou volbou rychle utečou. U obtížnosti Malý dinosaurus je penalizace mírnější.
 - Překážky: Ankylosaurus je rozbije (rozpad na kusy, úlomky, otřes kamery), ostatní je pomalu přelezou.
@@ -203,6 +208,8 @@ dinorush/
 - **Půda a tráva**: barva půdy má velké skvrny (světlejší louky, tmavší mech) i jemné odstíny, takže to není jedna plochá barva. Podél stezky rostou trsy trávy.
 - **Život v pozadí**: vedle trati se pomalu prochází stádo brachiosaurů (dva dospělí a mládě, krkem se rozhlížejí a spásají), nad údolím krouží hejno ptakoještěrů a mávají křídly.
 - **Světlo**: nižší slunce s delšími stíny, studené kontrasvětlo zezadu obkreslí dinosaury, jemné filmové mapování tónů (barvy zůstávají pestré) a při turbu se kamera lehce rozšíří.
+- **Animace kroku bez klouzání**: nohy se už nekývají podle sinusovky, ale střídají oporu a švih. Chodidlo v opoře stojí na zemi a posouvá se dozadu přesně rychlostí běhu, úhly kyčle, kolena a kotníku dopočítá inverzní kinematika a při rychlém běhu je fáze letu. Měření (unit test): klouzání chodidla na zemi kleslo z 4–70 % rychlosti běhu na nejvýš 4 %. Opraveno i to, že stegosaurus (47 cm) a brachiosaurus (23 cm) měli chodidla nad zemí a ankylosaurus a triceratops/styracosaurus 5–11 cm. Teď všichni stojí na zemi i v klidu.
+- **Denní doba a počasí**: kromě dne jsou závody **při západu slunce** (nízké zlaté slunce před dinosaury, dlouhé stíny, oranžová obloha a mlha), **v noci** (měsíc, třpytivé hvězdy, modré světlo, lucerničky podél stezky, světlušky na loukách, u sopky jiskry z lávy) a **v bouřce** (tmavé nízké mraky, hustý déšť, v dálce blesk na obzoru, jemné zesvětlení a o chvilku později tiché hřmění; s omezením animací se blesky vypínají). V kariéře mají vlastní denní dobu vybraná místa, např. Mlhavá mokřina (noc), Bahenní šampion (bouřka), Pán kaňonu (západ slunce), Lávový T-Rex (noc) nebo T-Rex Obr (bouřka při západu). První místa každé oblasti zůstávají za dne. Rychlé závody a denní výzva dostanou denní dobu podle seedu (zhruba 55 % den, 28 % západ, 17 % noc), takže „HRÁT ZNOVU“ vypadá stejně. Karta místa i úvod závodu ukazují, co čeká („Noční závod – cestu svítí lucerničky“).
 - **Výkon**: stáda i hejno se kreslí instancovaně (6 draw callů pro všechna zvířata), stíny vrhají jen velké části dinosaurů (o ~75 draw callů méně) a vzdálené rostliny a tráva stíny nevrhají. Při nízké kvalitě grafiky je rostlin, mraků a zvířat zhruba o polovinu méně.
 
 **Dlouhodobá motivace**
@@ -220,17 +227,17 @@ dinorush/
 
 ## 7. Testy
 
-- `npm test`: 94 unit testů. Pokrývají determinismus a validitu tratí pro všechny světy a obtížnosti, násobiče rychlosti, cooldown, perfektní proměnu (i to, že dřívější reakce nezpomalí), kombo, schopnosti, překážky, pořadí v cíli, přesnost a sílu AI, délku závodů 90–150 s, všech 6 režimů, normalizaci v multiplayeru, odměny, vylepšení, vajíčka, park, úkoly, pohár, ukládání (včetně poškozených dat a migrace), postupné odemykání dinosaurů, fráze a finále tratí, styly míst a sílu AI na místech kariéry.
+- `npm test`: 100 unit testů. Pokrývají determinismus a validitu tratí pro všechny světy a obtížnosti, násobiče rychlosti, cooldown, perfektní proměnu (i to, že dřívější reakce nezpomalí), kombo, schopnosti, překážky, pořadí v cíli, přesnost a sílu AI, délku závodů 90–150 s, všech 6 režimů, normalizaci v multiplayeru, odměny, vylepšení, vajíčka, park, úkoly, pohár, ukládání (včetně poškozených dat a migrace), postupné odemykání dinosaurů, fráze a finále tratí, styly míst a sílu AI na místech kariéry, to, že všichni dinosauři stojí na zemi a při běhu jim neklouzají chodidla, a denní dobu (rozdělení podle seedu, barvy, místa v kariéře).
 - `npm run e2e`: 26 scénářů v Chromiu. Odpovídají testům 1–20 ze zadání a navíc testují tutoriál, dobrodružství (hvězdy, odemčení, uložení), ducha, denní výzvu s rodinnou tabulkou a profily (nový hráč, společný závod s odměnami pro oba, výběr hráče po spuštění) a postupné odemykání dinosaurů s Letcem nad propastí. Používají skutečné dotyky přes CDP, včetně tří prstů najednou, emulaci iPadu, simulaci přechodu na pozadí a offline režim. Výsledek: `e2e/out/report.md` a screenshoty v `e2e/out/`.
 
 Poslední běh: **94/94 unit testů a 26/26 E2E scénářů prošlo** (T21 v samostatném běhu přes `E2E_ONLY=21`, protože v plném běhu mu vypršel tehdejší 20s limit; čekání je teď delší). Softwarové WebGL v testovacím prohlížeči kreslí jen 2–3 snímky za sekundu, proto mají scénáře, které čekají na odpočet, delší limity. Jednotlivé scénáře lze pustit přes `E2E_ONLY=18,19 node e2e/run-e2e.mjs`.
 
 ## 8. Omezení první verze
 
-- **Výkon na skutečném tabletu nebyl změřen.** Vývoj probíhal v kontejneru bez GPU (softwarové vykreslování ~6–12 FPS). Scéna má ~180–250 draw callů a ~90 tisíc trojúhelníků na snímek (nová krajina a detailnější dinosauři), s omezeným pixel ratio a bez stínů a postprocessingu. Na běžném tabletu by to mělo stačit na plynulý chod, ale ověřit to je potřeba na zařízení. V Nastavení lze vypnout „Vysokou kvalitu grafiky“.
+- **Výkon na skutečném tabletu nebyl změřen.** Vývoj probíhal v kontejneru bez GPU (softwarové vykreslování ~2–4 FPS). Scéna má při vysoké kvalitě ~170–290 draw callů a ~130–240 tisíc trojúhelníků na snímek, se stíny od slunce, s omezeným pixel ratio a bez postprocessingu. Při nízké kvalitě je to ~140 draw callů a ~130 tisíc trojúhelníků. Na běžném tabletu by to mělo stačit na plynulý chod, ale ověřit to je potřeba na zařízení. V Nastavení lze vypnout „Vysokou kvalitu grafiky“.
 - **Zvuky a hudba nebyly v testech poslechově ověřeny** (headless prohlížeč). Jsou syntetizované a záměrně tiché.
 - Testy proběhly v Chromiu (desktop + emulace iPadu). Safari na iPadu a Chrome na Androidu je potřeba vyzkoušet ručně. Ověřit hlavně multi-touch, zvuk po prvním dotyku a instalaci na plochu.
-- Modely se generují kódem (záměrně, bez externích souborů). Animace jsou procedurální, chodidla při běhu trochu kloužou.
+- Modely se generují kódem (záměrně, bez externích souborů). Animace jsou procedurální. Chodidla při rovném běhu nekloužou, v zatáčkách a při přechodu mezi pohyby (běh → plavání) se ale nohy přepnou do nové pozice skokem.
 - Kamera sleduje posledního lidského hráče. Počítačový soupeř, který běží těsně za ním, se skryje, aby nezakrýval výhled (v pořadí je dál vidět). Když se hráči hodně rozdělí, ten vepředu je v obraze menší.
 - Dynamické události mění vždy jen jeden úsek. Kombinované víceúsekové události zatím nejsou.
 - Hudba je jedna krátká smyčka pro menu a jedna pro závod.

@@ -1121,7 +1121,8 @@ button {
   animation: popIn 0.4s cubic-bezier(0.2, 1.6, 0.4, 1);
 }
 .intro-boss,
-.intro-ghost {
+.intro-ghost,
+.intro-sky {
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -1141,6 +1142,10 @@ button {
 .intro-ghost {
   background: linear-gradient(180deg, #74b9ff, #3a86c8);
   font-size: 20px;
+}
+.intro-sky {
+  background: linear-gradient(180deg, #6c5ce7, #3b2f8f);
+  font-size: 21px;
 }
 
 /* ------------------------------------------------------------------ animations */

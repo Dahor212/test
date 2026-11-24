@@ -1,4 +1,4 @@
-import type { TimeOfDay, WorldDefinition } from '../types';
+import type { TimeOfDay, WorldDefinition, WorldLook } from '../types';
 
 /**
  * Time of day and storms. A race keeps its world's character (colours of
@@ -14,6 +14,14 @@ export const TIME_INFO: Record<TimeOfDay, { name: string; icon: string }> = {
 };
 
 export const STORM_INFO = { name: 'Bouřka', icon: 'storm' };
+
+/** What a child sees on the place card and before the start (null for a plain day). */
+export function skyLabel(look: WorldLook | undefined): { name: string; icon: string; intro: string } | null {
+  if (look?.weather === 'storm') return { ...STORM_INFO, intro: 'Bouřka! Prší a v dálce se blýská' };
+  if (look?.time === 'sunset') return { ...TIME_INFO.sunset, intro: 'Závod při západu slunce' };
+  if (look?.time === 'night') return { ...TIME_INFO.night, intro: 'Noční závod – cestu svítí lucerničky' };
+  return null;
+}
 
 /** Quick races and daily challenges: mostly day, sometimes sunset, now and then a night race. */
 export function timeForSeed(seed: number): TimeOfDay {
@@ -46,9 +54,9 @@ export function applyTimeOfDay(world: WorldDefinition, time: TimeOfDay = 'day'):
     return {
       ...w,
       sky: { top: mixHex(w.sky.top, 0x3d3b8e, 0.65), bottom: mixHex(w.sky.bottom, 0xffa060, 0.75) },
-      fog: mixHex(w.fog, 0xf0a070, 0.6),
-      ambient: mixHex(w.ambient, 0xffc49a, 0.55),
-      sun: 0xffa552,
+      fog: mixHex(w.fog, 0xf0a070, 0.68),
+      ambient: mixHex(w.ambient, 0xffb98a, 0.7),
+      sun: 0xff9445,
       sunIntensity: w.sunIntensity * 0.95,
     };
   }

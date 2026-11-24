@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ABILITIES, ARCHETYPE_INFO, CLASSIC_ROLES } from '../../config/dinosaurs';
 import { MODES } from '../../config/modes';
 import { TERRAINS } from '../../config/terrain';
+import { skyLabel } from '../../config/timeOfDay';
 import { sound } from '../../audio/sound';
 import { nextChange } from '../../game/track';
 import { TutorialDirector, type TutorialPrompt } from '../../game/tutorial';
@@ -208,8 +209,13 @@ export function RaceScreen({ session }: { session: RaceSession }) {
                 {countdownText}
               </div>
             )}
-            {state.phase === 'countdown' && (session.config.boss || session.ghost) && (
+            {state.phase === 'countdown' && (session.config.boss || session.ghost || skyLabel(session.config.look)) && (
               <div className="race-intro" data-testid="race-intro">
+                {skyLabel(session.config.look) && (
+                  <span className="intro-sky" data-testid="intro-sky">
+                    <Icon name={skyLabel(session.config.look)!.icon} size={30} /> {skyLabel(session.config.look)!.intro}
+                  </span>
+                )}
                 {session.config.boss && (
                   <span className="intro-boss">
                     <Icon name="trex" size={34} /> {session.config.boss}
