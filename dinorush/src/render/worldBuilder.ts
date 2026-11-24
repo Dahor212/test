@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import type { SceneryId, WorldDefinition } from '../types';
-import { Backdrop, SUN_OFFSET } from './backdrop';
+import type { SceneryId, TimeOfDay, WorldDefinition } from '../types';
+import { Backdrop, sunOffsetFor } from './backdrop';
 import type { Particles } from './particles';
 import { PATH_HALF, TerrainField, TrackPath } from './trackPath';
 import { ribbon } from './trackScene';
@@ -398,6 +398,7 @@ export class WorldScenery {
   private cLight: THREE.Color;
   private cDark: THREE.Color;
   private density: number;
+  private lifeTimer = 0;
 
   constructor(
     world: WorldDefinition,
@@ -405,6 +406,8 @@ export class WorldScenery {
     private path: TrackPath,
     private field: TerrainField,
     quality: 'low' | 'high' = 'high',
+    private time: TimeOfDay = 'day',
+    calm = false,
   ) {
     this.world = world;
     this.scenery = scenery;
@@ -414,7 +417,7 @@ export class WorldScenery {
     this.c2 = new THREE.Color(world.ground2);
     this.cLight = new THREE.Color(this.style.light);
     this.cDark = new THREE.Color(this.style.dark);
-    this.backdrop = new Backdrop(world, scenery, quality);
+    this.backdrop = new Backdrop(world, scenery, quality, time, calm);
     this.group.add(this.backdrop.group);
     if (world.id === 'islands') {
       this.sea = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), mat(0x1fc8db, { flat: false, emissive: 0x05303a }));
@@ -510,6 +513,24 @@ export class WorldScenery {
         }
       }
     }
+    // at night little lanterns light the way along the trail
+    const halo = new GeoMerger();
+    if (this.time === 'night') {
+      for (const [k2, side] of [[6, -1], [21, 1]] as const) {
+        const d = k * CHUNK + k2;
+        if (d < 0) continue;
+        const o = side * (this.field.smoothEdge(d, side) + 1.3);
+        if (!this.field.isDry(d, o)) continue;
+        this.path.sample(d, o, p);
+        const y = this.field.groundY(d, o);
+        rNear.y = y;
+        rNear.add(GEO.cylinder(6), 0x5a3d22, [p.x, 0, p.z], [0.07, 1.65, 0.07]);
+        rNear.add(GEO.box(), 0x3b2a1a, [p.x, 1.62, p.z], [0.36, 0.06, 0.36]);
+        glow.add(GEO.sphere(1), 0xffd98a, [p.x, y + 1.82, p.z], 0.19);
+        halo.add(GEO.sphere(1), 0xffb347, [p.x, y + 1.82, p.z], 0.7);
+        halo.add(GEO.disc(), 0xffa733, [p.x, y + 0.04, p.z], 1.6);
+      }
+    }
     if (st.glow && hash01(seed + 99) > 0.35) {
       const side = hash01(seed + 7) > 0.5 ? 1 : -1;
       const d = k * CHUNK + hash01(seed + 9) * CHUNK;
@@ -534,6 +555,11 @@ export class WorldScenery {
     }
     const b = glow.build(new THREE.MeshBasicMaterial({ vertexColors: true }));
     if (b) g.add(b);
+    const h = halo.build(new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false }));
+    if (h) {
+      h.renderOrder = 4;
+      g.add(h);
+    }
     return g;
   }
 
@@ -601,7 +627,25 @@ export class WorldScenery {
     const fwd = new THREE.Vector3();
     camera.getWorldDirection(fwd);
     this.weatherTimer += dt;
-    if (this.world.weather === 'snow' && this.weatherTimer > 0.05) {
+    this.lifeTimer += dt;
+    // night life: fireflies over the meadows, sparks above the volcano's lava
+    if (this.time === 'night' && this.scenery !== 'ice' && this.lifeTimer > 0.07) {
+      this.lifeTimer = 0;
+      const k = 6 + Math.random() * 40;
+      const side = Math.random() > 0.5 ? 1 : -1;
+      const off = 5 + Math.random() * 18;
+      const x = cx + fwd.x * k - fwd.z * side * off;
+      const z = cz + fwd.z * k + fwd.x * side * off;
+      if (this.scenery === 'volcano') particles.emit('ember', x, 0.3, z, { count: 1 });
+      else particles.emit('firefly', x, 0.6 + Math.random() * 2.2, z, { count: 1 });
+    }
+    if (this.world.weather === 'storm' && this.weatherTimer > 0.016) {
+      this.weatherTimer = 0;
+      for (let i = 0; i < 2; i++) {
+        const k = 4 + Math.random() * 34;
+        particles.emit('splash', cx + fwd.x * k + (Math.random() - 0.5) * 34, 10, cz + fwd.z * k + (Math.random() - 0.5) * 34, { count: 1, color: 0xc8e4f2, scale: 0.55 });
+      }
+    } else if (this.world.weather === 'snow' && this.weatherTimer > 0.05) {
       this.weatherTimer = 0;
       const k = 8 + Math.random() * 40;
       particles.emit('snow', cx + fwd.x * k + (Math.random() - 0.5) * 36, 6, cz + fwd.z * k + (Math.random() - 0.5) * 36, { count: 2 });
@@ -629,15 +673,29 @@ export class WorldScenery {
  * Sun (key light, casts the shadows), a sky/ground hemisphere fill and a
  * soft cool rim light from behind that outlines the dinosaurs.
  */
-export function applyWorldLighting(scene: THREE.Scene, world: WorldDefinition): { hemi: THREE.HemisphereLight; sun: THREE.DirectionalLight; rim: THREE.DirectionalLight } {
+export function applyWorldLighting(
+  scene: THREE.Scene,
+  world: WorldDefinition,
+  time: TimeOfDay = 'day',
+): { hemi: THREE.HemisphereLight; sun: THREE.DirectionalLight; rim: THREE.DirectionalLight } {
   scene.fog = new THREE.Fog(world.fog, world.fogNear, world.fogFar);
   scene.background = new THREE.Color(world.fog);
   const skyTint = new THREE.Color(world.ambient).lerp(new THREE.Color(world.sky.top), 0.25);
-  const hemi = new THREE.HemisphereLight(skyTint, world.ground, world.id === 'volcano' ? 2.0 : 1.55);
+  const storm = world.weather === 'storm';
+  const dim = (time === 'night' ? 0.62 : time === 'sunset' ? 0.85 : 1) * (storm ? 0.8 : 1);
+  const hemi = new THREE.HemisphereLight(skyTint, world.ground, (world.id === 'volcano' ? 2.0 : 1.55) * dim);
   const sun = new THREE.DirectionalLight(world.sun, world.sunIntensity * 1.15);
-  sun.position.copy(SUN_OFFSET);
-  const rim = new THREE.DirectionalLight(new THREE.Color(world.sky.top).lerp(new THREE.Color(0xffffff), 0.5), 0.7);
-  rim.position.set(-SUN_OFFSET.x, SUN_OFFSET.y * 0.6, -SUN_OFFSET.z);
+  const offset = sunOffsetFor(time);
+  sun.position.copy(offset);
+  let rim: THREE.DirectionalLight;
+  if (time === 'day') {
+    rim = new THREE.DirectionalLight(new THREE.Color(world.sky.top).lerp(new THREE.Color(0xffffff), 0.5), 0.7);
+    rim.position.set(-offset.x, offset.y * 0.6, -offset.z);
+  } else {
+    // the low sun / moon is ahead: a soft fill from behind the camera keeps the racers readable
+    rim = new THREE.DirectionalLight(time === 'night' ? 0x9db8ff : 0xffc6a6, time === 'night' ? 1.0 : 0.9);
+    rim.position.set(10, 14, 40);
+  }
   scene.add(hemi, sun, sun.target, rim);
   return { hemi, sun, rim };
 }

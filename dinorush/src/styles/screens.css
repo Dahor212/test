@@ -2013,6 +2013,21 @@
   align-items: flex-end;
   gap: 10px;
 }
+/* 3D dinosaurs and confetti are drawn over the podium (see render/podium.ts) */
+.podium.podium-3d {
+  position: relative;
+}
+.podium-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+.podium-dino {
+  width: 100%;
+}
 .podium-col {
   display: flex;
   flex-direction: column;

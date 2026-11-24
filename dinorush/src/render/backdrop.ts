@@ -1,11 +1,21 @@
 import * as THREE from 'three';
-import type { SceneryId, WorldDefinition } from '../types';
+import type { SceneryId, TimeOfDay, WorldDefinition } from '../types';
 import type { Particles } from './particles';
 import { GeoMerger, GEO, hash01 } from './util';
 
 /** Direction from the action towards the sun (also drives the shadows). */
 export const SUN_OFFSET = new THREE.Vector3(-26, 34, 20);
-const SUN_DIR = SUN_OFFSET.clone().normalize();
+
+/**
+ * Sun (or moon) position relative to the action for a time of day. The
+ * track mostly heads towards -Z, so the low evening sun and the moon sit
+ * ahead where the children can see them.
+ */
+export function sunOffsetFor(time: TimeOfDay = 'day'): THREE.Vector3 {
+  if (time === 'sunset') return new THREE.Vector3(-14, 9, -46);
+  if (time === 'night') return new THREE.Vector3(22, 22, -40);
+  return SUN_OFFSET.clone();
+}
 
 // ---------------------------------------------------------------------------
 // Sky dome: gradient with a horizon haze band and a glowing sun
@@ -26,21 +36,35 @@ uniform vec3 uHorizon;
 uniform vec3 uSun;
 uniform vec3 uSunDir;
 uniform float uSunGlow;
+uniform vec3 uDisc;
+uniform float uDiscSize;
+uniform float uStars;
+uniform float uFlash;
+uniform float uTime;
 varying vec3 vDir;
 void main() {
   vec3 d = normalize(vDir);
   float h = d.y;
   vec3 col = mix(uHorizon, uBottom, smoothstep(-0.02, 0.16, h));
   col = mix(col, uTop, smoothstep(0.1, 0.75, h));
+  // stars: tiny twinkling dots high in the night sky
+  if (uStars > 0.0 && h > 0.03) {
+    vec3 cell = floor(d * 620.0);
+    float r = fract(sin(dot(cell, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+    float star = step(0.9972, r) * smoothstep(0.03, 0.3, h);
+    col += vec3(star * (0.55 + 0.45 * sin(uTime * 2.3 + r * 80.0)) * uStars);
+  }
   float s = max(dot(d, uSunDir), 0.0);
   col += uSun * (pow(s, 6.0) * 0.22 + pow(s, 40.0) * 0.35) * uSunGlow;
-  col = mix(col, vec3(1.0, 0.99, 0.94), smoothstep(0.9975, 0.999, s));
+  col = mix(col, uDisc, smoothstep(1.0 - uDiscSize, 1.0 - uDiscSize * 0.55, s));
+  // lightning lights up the clouds
+  col += vec3(0.75, 0.8, 0.95) * uFlash * (0.35 + 0.65 * smoothstep(0.0, 0.5, h));
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
 
-function skyDome(top: number, bottom: number, horizon: number, sun: number, glow: number): THREE.Mesh {
+function skyDome(top: number, bottom: number, horizon: number, sun: number, glow: number, sunDir: THREE.Vector3, time: TimeOfDay): THREE.Mesh {
   const mat = new THREE.ShaderMaterial({
     vertexShader: SKY_VERT,
     fragmentShader: SKY_FRAG,
@@ -49,8 +73,14 @@ function skyDome(top: number, bottom: number, horizon: number, sun: number, glow
       uBottom: { value: new THREE.Color(bottom) },
       uHorizon: { value: new THREE.Color(horizon) },
       uSun: { value: new THREE.Color(sun) },
-      uSunDir: { value: SUN_DIR.clone() },
+      uSunDir: { value: sunDir.clone() },
       uSunGlow: { value: glow },
+      // the moon is a small pale disc, the evening sun a big golden one
+      uDisc: { value: new THREE.Color(time === 'night' ? 0xf1f4ff : time === 'sunset' ? 0xffe2a0 : 0xfffcf0) },
+      uDiscSize: { value: time === 'night' ? 0.0011 : time === 'sunset' ? 0.004 : 0.0025 },
+      uStars: { value: time === 'night' ? 1 : 0 },
+      uFlash: { value: 0 },
+      uTime: { value: 0 },
     },
     side: THREE.BackSide,
     depthWrite: false,
@@ -115,14 +145,14 @@ function cloudTexture(): THREE.Texture {
   return tex;
 }
 
-function cloudLayer(count: number, tint: number, seed: number, opacity: number): THREE.Mesh {
+function cloudLayer(count: number, tint: number, seed: number, opacity: number, heightK = 1): THREE.Mesh {
   const pos: number[] = [];
   const uv: number[] = [];
   const idx: number[] = [];
   for (let i = 0; i < count; i++) {
     const a = (i / count) * Math.PI * 2 + hash01(seed + i * 5) * 0.5;
     const r = 210 + hash01(seed + i * 11) * 130;
-    const y = 64 + hash01(seed + i * 3) * 66;
+    const y = (64 + hash01(seed + i * 3) * 66) * heightK;
     const w = 55 + hash01(seed + i * 9) * 65;
     const h = w * 0.5;
     const cx = Math.sin(a) * r;
@@ -194,7 +224,7 @@ function ridgeHeight(a: number, L: Ridge): number {
   return L.base + L.amp * n;
 }
 
-function ridgeMesh(L: Ridge, haze: THREE.Color, sunAz: number): THREE.Mesh {
+function ridgeMesh(L: Ridge, haze: THREE.Color, sunAz: number, shade: THREE.Color): THREE.Mesh {
   const N = L.mesa ? 420 : 260;
   const rows = L.mesa ? [0, 0.3, 0.46, 0.62, 0.78, 0.9, 1] : [0, 0.55, 0.82, 1];
   const pos: number[] = [];
@@ -220,7 +250,7 @@ function ridgeMesh(L: Ridge, haze: THREE.Color, sunAz: number): THREE.Mesh {
       c.copy(base).lerp(top, f);
       if (L.mesa && ri > 0 && ri < rows.length - 1 && ri % 2 === 0) c.copy(stripe);
       if (L.snow !== undefined && y > L.snow) c.lerp(snow, Math.min(1, (y - L.snow) / 8 + 0.5));
-      c.multiplyScalar(light);
+      c.multiplyScalar(light).multiply(shade);
       // haze: strongest at the foot of the mountains
       c.lerp(haze, Math.min(1, L.haze + (1 - f) * 0.35));
       col.push(c.r, c.g, c.b);
@@ -349,6 +379,32 @@ function waterfallTexture(): THREE.CanvasTexture {
   return tex;
 }
 
+/** A jagged lightning bolt (flat ribbon facing the viewer) on the horizon. */
+function boltMesh(az: number, r: number): THREE.Mesh {
+  const pts: THREE.Vector3[] = [];
+  let x = 0;
+  for (let i = 0; i <= 9; i++) {
+    pts.push(new THREE.Vector3(x, 120 - i * 13, 0));
+    x += (Math.random() - 0.5) * 14;
+  }
+  const pos: number[] = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i];
+    const b = pts[i + 1];
+    const w = 1.6 - i * 0.12;
+    pos.push(a.x - w, a.y, 0, a.x + w, a.y, 0, b.x + w, b.y, 0, a.x - w, a.y, 0, b.x + w, b.y, 0, b.x - w, b.y, 0);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xeef4ff, fog: false, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }));
+  m.position.set(Math.sin(az) * r, 0, -Math.cos(az) * r);
+  m.rotation.y = -az;
+  m.renderOrder = -7;
+  m.frustumCulled = false;
+  m.visible = false;
+  return m;
+}
+
 /**
  * Everything far away: sky, sun, clouds, rings of mountains and one big
  * landmark per landscape (volcano, waterfall, rock arch, ice spires…).
@@ -363,16 +419,34 @@ export class Backdrop {
   private smoke: THREE.Vector3[] = [];
   private smokeTimer = 0;
   private smokeColor: number[] = [];
+  /** Colour the unlit far scenery is multiplied by (dusk / night). */
+  private shade: THREE.Color;
+  private storm: boolean;
+  /** Current lightning brightness 0..1 (the renderer brightens the lights with it). */
+  flash = 0;
+  private nextFlash = 5;
+  private flicker = 0;
+  private thunderIn = -1;
+  private bolt: THREE.Mesh | null = null;
+  /** Set when thunder should rumble now (the renderer plays the sound). */
+  thunder = false;
 
-  constructor(world: WorldDefinition, scenery: SceneryId, quality: 'low' | 'high') {
+  constructor(world: WorldDefinition, scenery: SceneryId, quality: 'low' | 'high', time: TimeOfDay = 'day', private calm = false) {
     const spec = BACKDROPS[scenery] ?? BACKDROPS.jungle;
     const haze = new THREE.Color(world.fog);
-    this.sky = skyDome(world.sky.top, world.sky.bottom, world.fog, world.sun, spec.sunGlow);
+    this.storm = world.weather === 'storm';
+    this.shade = new THREE.Color(time === 'night' ? 0x3c4a78 : time === 'sunset' ? 0xd8a088 : this.storm ? 0x9aa3a6 : 0xffffff);
+    const sunDir = sunOffsetFor(time).normalize();
+    const glow = time === 'night' ? 0.35 : this.storm ? 0.15 : time === 'sunset' ? 1.6 : spec.sunGlow;
+    this.sky = skyDome(world.sky.top, world.sky.bottom, world.fog, world.sun, glow, sunDir, time);
     this.group.add(this.sky, this.far);
-    const sunAz = Math.atan2(SUN_DIR.x, -SUN_DIR.z);
-    spec.ridges.forEach((r, i) => this.far.add(ridgeMesh({ ...r, seed: i * 1.7 + scenery.length * 0.37 }, haze, sunAz)));
-    const n = quality === 'high' ? spec.clouds : Math.ceil(spec.clouds * 0.6);
-    this.clouds = cloudLayer(n, spec.cloudTint, scenery.length * 13, spec.cloudOpacity);
+    const sunAz = Math.atan2(sunDir.x, -sunDir.z);
+    spec.ridges.forEach((r, i) => this.far.add(ridgeMesh({ ...r, seed: i * 1.7 + scenery.length * 0.37 }, haze, sunAz, this.shade)));
+    const base = this.storm ? Math.round(spec.clouds * 1.8) : spec.clouds;
+    const n = quality === 'high' ? base : Math.ceil(base * 0.6);
+    const tint = this.storm ? 0x59626b : time === 'night' ? 0x46557a : time === 'sunset' ? 0xffb58f : spec.cloudTint;
+    const opacity = time === 'night' && !this.storm ? 0.55 : this.storm ? 0.97 : spec.cloudOpacity;
+    this.clouds = cloudLayer(n, tint, scenery.length * 13, opacity, this.storm ? 0.7 : 1);
     this.group.add(this.clouds);
     this.landmark(scenery, haze);
   }
@@ -417,7 +491,7 @@ export class Backdrop {
       const tex = waterfallTexture();
       this.fall = tex;
       tex.repeat.set(1, 2.5);
-      const fall = new THREE.Mesh(new THREE.PlaneGeometry(10, 36), new THREE.MeshBasicMaterial({ map: tex, fog: false, transparent: true, opacity: 0.92, side: THREE.DoubleSide }));
+      const fall = new THREE.Mesh(new THREE.PlaneGeometry(10, 36), new THREE.MeshBasicMaterial({ map: tex, color: this.shade, fog: false, transparent: true, opacity: 0.92, side: THREE.DoubleSide }));
       const [fx, fz] = at(az, 214);
       fall.position.set(fx, 16, fz);
       fall.rotation.y = -az;
@@ -460,7 +534,9 @@ export class Backdrop {
       a.frustumCulled = false;
       this.far.add(a);
     }
-    const g = glow.build(new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }));
+    // lava keeps glowing at night, mist and ice dim with the light
+    const lava = scenery === 'volcano' || scenery === 'islands';
+    const g = glow.build(new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, color: lava ? 0xffffff : this.shade }));
     if (g) {
       g.renderOrder = -5;
       g.frustumCulled = false;
@@ -476,6 +552,10 @@ export class Backdrop {
       this.clouds.rotation.y = time * 0.004;
     }
     if (this.fall) this.fall.offset.y = time * 0.9;
+    const u = (this.sky.material as THREE.ShaderMaterial).uniforms;
+    u.uTime.value = time;
+    this.updateLightning(camera, dt);
+    u.uFlash.value = this.flash * 0.45;
     this.smokeTimer += dt;
     if (particles && this.smoke.length && this.smokeTimer > 0.25) {
       this.smokeTimer = 0;
@@ -483,6 +563,43 @@ export class Backdrop {
       const t = this.smoke[Math.floor(Math.random() * this.smoke.length)];
       particles.emit('smoke', camera.position.x + t.x * 0.5, t.y * 0.5, camera.position.z + t.z * 0.5, { count: 1, scale: 4.5, color: this.smokeColor });
     }
+  }
+
+  /**
+   * Distant lightning in a storm: a soft flash every few seconds, at most
+   * one quick flicker, the bolt far on the horizon, thunder a moment later.
+   * Off with reduced motion (no flashing for sensitive children).
+   */
+  private updateLightning(camera: THREE.Camera, dt: number) {
+    this.thunder = false;
+    if (!this.storm || this.calm) return;
+    this.flash = Math.max(0, this.flash - dt * 3.2);
+    if (this.flicker > 0) {
+      this.flicker -= dt;
+      if (this.flicker <= 0) this.flash = Math.max(this.flash, 0.7);
+    }
+    if (this.bolt) this.bolt.visible = this.flash > 0.35;
+    if (this.thunderIn > 0) {
+      this.thunderIn -= dt;
+      if (this.thunderIn <= 0) this.thunder = true;
+    }
+    this.nextFlash -= dt;
+    if (this.nextFlash > 0) return;
+    this.nextFlash = 5 + Math.random() * 6;
+    this.flash = 1;
+    this.flicker = Math.random() < 0.5 ? 0.12 : 0;
+    this.thunderIn = 0.5 + Math.random() * 0.9;
+    // a new zig-zag bolt somewhere ahead on the horizon
+    if (this.bolt) {
+      this.far.remove(this.bolt);
+      this.bolt.geometry.dispose();
+      (this.bolt.material as THREE.Material).dispose();
+    }
+    const fwd = new THREE.Vector3();
+    camera.getWorldDirection(fwd);
+    const az = Math.atan2(fwd.x, -fwd.z) + (Math.random() - 0.5) * 1.6;
+    this.bolt = boltMesh(az, 230 + Math.random() * 60);
+    this.far.add(this.bolt);
   }
 
   dispose() {

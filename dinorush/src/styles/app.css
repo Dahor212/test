@@ -91,6 +91,37 @@ button {
   overflow: hidden;
   min-height: 0;
 }
+/* slow-motion finish: cinematic letterbox bars slide in */
+.race-view::before,
+.race-view::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 9%;
+  background: #0b0f1a;
+  z-index: 6;
+  pointer-events: none;
+  transition: transform 0.45s ease;
+}
+.race-view::before {
+  top: 0;
+  transform: translateY(-101%);
+}
+.race-view::after {
+  bottom: 0;
+  transform: translateY(101%);
+}
+.race-view.slowmo::before,
+.race-view.slowmo::after {
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .race-view::before,
+  .race-view::after {
+    transition: none;
+  }
+}
 .race-canvas {
   position: absolute;
   inset: 0;

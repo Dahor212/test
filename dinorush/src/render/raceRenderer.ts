@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ARCHETYPE_INFO } from '../config/dinosaurs';
+import { applyTimeOfDay } from '../config/timeOfDay';
 import { WORLDS } from '../config/worlds';
 import type { GhostPlayer } from '../game/ghost';
 import type { RaceEngine } from '../game/raceEngine';
@@ -12,7 +13,7 @@ import { racerHeading, racerLateral, TerrainField, TrackPath } from './trackPath
 import { TrackScene } from './trackScene';
 import { nameTagTexture } from './textures';
 import { castBigShadows, disposeObject } from './util';
-import { SUN_OFFSET } from './backdrop';
+import { sunOffsetFor } from './backdrop';
 import { Wildlife } from './wildlife';
 import { applyWorldLighting, WorldScenery } from './worldBuilder';
 
@@ -55,11 +56,16 @@ export class RaceRenderer {
   private container: HTMLElement;
   private tmp = new THREE.Vector3();
   private sun: THREE.DirectionalLight;
+  private hemi: THREE.HemisphereLight;
+  private hemiBase = 1;
+  private sunOffset: THREE.Vector3;
   private shadows: boolean;
   private ghost: GhostVisual | null = null;
   private ghostLane = 2;
   /** Smoothed running-surface height per racer (gorges). */
   private groundY = new Map<string, number>();
+  /** Cinematic camera beside the finish arch (slow-motion finish). */
+  private finishCam: { pid: string; t: number } | null = null;
   private mistTimer = 0;
 
   constructor(container: HTMLElement, engine: RaceEngine, opts: RaceRendererOptions, ghost: GhostPlayer | null = null) {
@@ -72,7 +78,7 @@ export class RaceRenderer {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     // gentle filmic curve: keeps the bright toy colours but rolls off harsh highlights
     this.renderer.toneMapping = THREE.NeutralToneMapping;
-    this.renderer.toneMappingExposure = 1.08;
+    this.renderer.toneMappingExposure = (engine.state.config.look?.time ?? 'day') === 'night' ? 1.2 : 1.08;
     this.shadows = high;
     if (high) {
       this.renderer.shadowMap.enabled = true;
@@ -83,9 +89,13 @@ export class RaceRenderer {
     this.camera = new THREE.PerspectiveCamera(50, 2, 0.5, 700);
     const s = engine.state;
     // a map location may tint the sky, fog and light and bring its own weather
-    const world = { ...WORLDS[s.config.worldId], ...(s.config.look ?? {}) };
-    const lights = applyWorldLighting(this.scene, world);
+    const time = s.config.look?.time ?? 'day';
+    const world = applyTimeOfDay({ ...WORLDS[s.config.worldId], ...(s.config.look ?? {}) }, time);
+    const lights = applyWorldLighting(this.scene, world, time);
     this.sun = lights.sun;
+    this.hemi = lights.hemi;
+    this.hemiBase = lights.hemi.intensity;
+    this.sunOffset = sunOffsetFor(time);
     if (this.shadows) {
       this.sun.castShadow = true;
       this.sun.shadow.mapSize.set(1024, 1024);
@@ -102,7 +112,7 @@ export class RaceRenderer {
     this.path = new TrackPath(s.config.seed);
     this.field = new TerrainField(s.track, s.config.worldId, (s.config.seed % 1000) / 100);
     const scenery = s.config.look?.scenery ?? world.id;
-    this.world = new WorldScenery(world, scenery, this.path, this.field, opts.quality);
+    this.world = new WorldScenery(world, scenery, this.path, this.field, opts.quality, time, opts.reducedMotion);
     this.scene.add(this.world.group);
     this.wildlife = new Wildlife(scenery, this.path, this.field, opts.quality, s.config.seed);
     this.scene.add(this.wildlife.group);
@@ -252,7 +262,16 @@ export class RaceRenderer {
           break;
         }
         case 'finish':
-          if (p && p.kind === 'human') this.particles.emit('confetti', wp.x, 3, wp.z, { count: 40 });
+          if (p && p.kind === 'human') {
+            this.particles.emit('confetti', wp.x, 3, wp.z, { count: 40 });
+            // bursts from the tops of the finish arch
+            const L = s.track.length;
+            for (const side of [-1, 1]) {
+              const q = this.path.sample(L, side * 8.5, this.tmp);
+              this.particles.emit('confetti', q.x, 5.8, q.z, { count: 28 });
+              this.particles.emit('sparkle', q.x, 5.6, q.z, { count: 18, color: [0xffd32a, 0xffffff, 0xff6b81] });
+            }
+          }
           break;
         case 'trexCatch':
           this.trexRoar = 1.2;
@@ -274,7 +293,16 @@ export class RaceRenderer {
     this.shake = Math.max(this.shake, amount);
   }
 
-  render(dt: number) {
+  /** Watch the given racer run through the finish from beside the arch. */
+  startFinishCam(participantId: string) {
+    if (!this.finishCam) this.finishCam = { pid: participantId, t: 0 };
+  }
+
+  /**
+   * dt: simulated time of this frame (slower in slow motion);
+   * realDt: wall-clock time, used for the camera so it glides normally.
+   */
+  render(dt: number, realDt = dt) {
     const s = this.engine.state;
     this.time += dt;
     const target = this.anchorTarget();
@@ -357,6 +385,18 @@ export class RaceRenderer {
     desiredPos.y = height + dip * 0.45;
     const look = this.path.sample(this.anchor + ahead, lat * 0.25, new THREE.Vector3());
     look.y = 1.2 + dip * 0.7;
+    const fc = this.finishCam;
+    const fcp = fc ? s.participants.find((p) => p.id === fc.pid) : undefined;
+    if (fc && fcp) {
+      // stand beside the finish arch, on the far side from the racer, and watch it run through
+      fc.t += realDt;
+      const L = s.track.length;
+      const side = racerLateral(this.path, fcp.lane, L) >= 0 ? -1 : 1;
+      this.path.sample(L + 5 + Math.min(5, fc.t * 1.4), side * 8.5, desiredPos);
+      desiredPos.y = 1.8 + this.field.trackY(L + 5);
+      this.path.sample(fcp.position, racerLateral(this.path, fcp.lane, fcp.position), look);
+      look.y = 1.1 + (this.groundY.get(fcp.id) ?? 0);
+    }
     // mist rising from gorges ahead
     this.mistTimer += dt;
     if (this.mistTimer > 0.12 && !this.opts.reducedMotion) {
@@ -372,11 +412,13 @@ export class RaceRenderer {
       this.camLook.copy(look);
       this.camInit = true;
     }
-    const kc = Math.min(1, dt * 4 || 1);
+    const kc = Math.min(1, (fc ? realDt * 5 : realDt * 4) || 1);
     this.camPos.lerp(desiredPos, kc);
     this.camLook.lerp(look, kc);
-    if (this.camPos.distanceTo(desiredPos) > 25) this.camPos.copy(desiredPos);
-    if (this.camLook.distanceTo(look) > 25) this.camLook.copy(look);
+    // the finish camera swoops over; otherwise far jumps (restart, teleport) cut
+    const cut = fc ? 60 : 25;
+    if (this.camPos.distanceTo(desiredPos) > cut) this.camPos.copy(desiredPos);
+    if (this.camLook.distanceTo(look) > cut) this.camLook.copy(look);
     this.camera.position.copy(this.camPos);
     if (this.shake > 0) {
       this.camera.position.x += (Math.random() - 0.5) * this.shake;
@@ -388,7 +430,7 @@ export class RaceRenderer {
       // keep the shadow camera centred on the action
       const c = this.path.sample(this.anchor + 10, 0, this.tmp);
       this.sun.target.position.set(c.x, 0, c.z);
-      this.sun.position.set(c.x + SUN_OFFSET.x, SUN_OFFSET.y, c.z + SUN_OFFSET.z);
+      this.sun.position.set(c.x + this.sunOffset.x, this.sunOffset.y, c.z + this.sunOffset.z);
       this.sun.target.updateMatrixWorld();
     }
 
@@ -400,11 +442,12 @@ export class RaceRenderer {
       }
     }
 
-    // a touch wider view when the followed racer is flying along (turbo, abilities)
-    if (!this.opts.reducedMotion) {
+    // a touch wider view when the followed racer is flying along (turbo, abilities),
+    // a closer look at the finish
+    if (!this.opts.reducedMotion || fc) {
       const base = this.engine.difficulty.baseSpeed;
-      const kick = Math.max(0, Math.min(5, (focusP.speed - base * 1.05) * 0.9));
-      const nk = this.fovKick + (kick - this.fovKick) * Math.min(1, dt * 2.5 || 1);
+      const kick = fc ? -9 : Math.max(0, Math.min(5, (focusP.speed - base * 1.05) * 0.9));
+      const nk = this.fovKick + (kick - this.fovKick) * Math.min(1, realDt * 2.5 || 1);
       if (Math.abs(nk - this.fovKick) > 0.01) {
         this.fovKick = nk;
         this.camera.fov = this.baseFov + nk;
@@ -413,8 +456,15 @@ export class RaceRenderer {
     }
     this.world.update(from, to, this.camera, dt, this.time, this.particles, !this.opts.reducedMotion);
     this.wildlife.update(this.anchor, dt, this.time);
+    // lightning brightens the whole scene for a moment
+    this.hemi.intensity = this.hemiBase + this.world.backdrop.flash * 1.2;
     this.particles.update(dt);
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /** True in the frame when distant thunder should rumble (storm). */
+  get thunderNow(): boolean {
+    return this.world.backdrop.thunder;
   }
 
   /** Screen coordinates (CSS px, relative to container) above a racer. */

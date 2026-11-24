@@ -1,4 +1,5 @@
 import { AI_COLORS, AI_NAMES, DIFFICULTIES, PLAYER_COLORS } from '../config/difficulty';
+import { timeForSeed } from '../config/timeOfDay';
 import { Rng } from '../core/rng';
 import { baseLoadout, loadoutFor } from '../progression/rpg';
 import type { AIProfileId, PlayerProfile, RaceConfig, RaceSetup } from '../types';
@@ -84,5 +85,7 @@ export function buildRaceConfig(setup: RaceSetup, seed: number, tutorial = false
     seed,
     normalizeStats: setup.humans >= 2 && setup.mode !== 'team',
     tutorial,
+    // quick races and daily challenges: mostly day, sometimes sunset or a night race
+    ...(tutorial ? {} : { look: { time: timeForSeed(seed) } }),
   };
 }

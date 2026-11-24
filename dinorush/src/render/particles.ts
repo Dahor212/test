@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { particleTexture } from './textures';
 
-export type ParticleKind = 'dust' | 'splash' | 'sparkle' | 'debris' | 'confetti' | 'snow' | 'smoke' | 'coin' | 'mud' | 'ring';
+export type ParticleKind = 'dust' | 'splash' | 'sparkle' | 'debris' | 'confetti' | 'snow' | 'smoke' | 'coin' | 'mud' | 'ring' | 'firefly' | 'ember';
 
 interface Spawn {
   color: number | number[];
@@ -26,6 +26,10 @@ const PRESETS: Record<ParticleKind, Spawn> = {
   smoke: { color: [0x8a8a8a, 0x6b6b6b, 0xa0a0a0], count: 1, speed: [0.2, 0.6], up: [1.5, 2.5], size: [2.5, 4], life: [2.5, 4], gravity: -0.2, drag: 0.2, spread: 1.5 },
   coin: { color: [0xffd32a, 0xffe066, 0xffffff], count: 10, speed: [1, 3], up: [1, 3], size: [0.2, 0.4], life: [0.4, 0.7], gravity: 2, drag: 2, spread: 0.3 },
   ring: { color: 0xffffff, count: 18, speed: [5, 6], up: [0, 0.2], size: [0.35, 0.5], life: [0.35, 0.45], gravity: 0, drag: 3, spread: 0.2 },
+  // night: slow glowing fireflies drifting near the trail
+  firefly: { color: [0xeaff6a, 0xd4ff4a, 0xfff38a], count: 1, speed: [0.2, 0.6], up: [-0.2, 0.4], size: [0.22, 0.34], life: [2.5, 4.5], gravity: -0.05, drag: 0.2, spread: 0.3 },
+  // volcano at night: sparks rising from the lava
+  ember: { color: [0xff8a1a, 0xffb43a, 0xff5a1a], count: 1, speed: [0.2, 0.7], up: [1.2, 2.6], size: [0.16, 0.26], life: [1.6, 2.8], gravity: -0.3, drag: 0.4, spread: 0.6 },
 };
 
 const VERT = /* glsl */ `

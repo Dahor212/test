@@ -22,6 +22,7 @@ import {
   type DinoAnimMode,
   type DinoRig,
 } from './dinoKit';
+import { gaitBob, gaitFor, solveLegs, type GaitState } from './gait';
 import { SPECIES_BUILDERS } from './species';
 import { GEO, group, mat, mesh } from './util';
 
@@ -311,7 +312,8 @@ function ankylo(p: DinoPalette): DinoRig {
   const frontRest: [number, number] = [0.15, -0.25];
   const hindDrop = legDrop(hindL, hindRest) + 0.07;
   const frontDrop = legDrop(frontL, frontRest) + 0.07;
-  rig.hipHeight = hindDrop;
+  // the sole is the foot origin: no extra clearance, so the feet stand on the ground
+  rig.hipHeight = hindDrop - 0.06;
   for (const side of [-1, 1]) {
     const hind = quadLeg(side, [side * 0.44, 0, 0.38], hindL, 0.14, hindRest, p, false, em, skin);
     hind.phase = side > 0 ? 0 : Math.PI;
@@ -414,11 +416,11 @@ function ceratopsian(p: DinoPalette, styr: boolean): DinoRig {
   const frontRest: [number, number] = [0.25, -0.35];
   const hindDrop = legDrop(hindL, hindRest) + 0.07;
   const frontDrop = legDrop(frontL, frontRest) + 0.07;
-  rig.hipHeight = hindDrop;
+  rig.hipHeight = hindDrop - 0.06;
   for (const side of [-1, 1]) {
     const hind = quadLeg(side, [side * 0.44, 0, 0.32], hindL, 0.17, hindRest, p, false, em, skin);
     hind.phase = side > 0 ? 0 : Math.PI;
-    const front = quadLeg(side, [side * 0.42, frontDrop - hindDrop + 0.05, -0.74], frontL, 0.15, frontRest, p, true, em, skin, 5);
+    const front = quadLeg(side, [side * 0.42, frontDrop - hindDrop, -0.74], frontL, 0.15, frontRest, p, true, em, skin, 5);
     front.phase = side > 0 ? Math.PI : 0;
     rig.hips.add(hind.hip, front.hip);
     rig.legs.push(hind, front);
@@ -637,8 +639,19 @@ export function setAccessory(rig: DinoRig, id: string | null) {
 
 export function animateDino(rig: DinoRig, dt: number, speed: number, mode: DinoAnimMode, time: number) {
   const runLike = mode === 'run' || mode === 'wade' || mode === 'mud' || mode === 'slip' || mode === 'smash';
-  const strideMul = mode === 'wade' || mode === 'mud' ? 0.8 : 1;
-  const cycle = runLike ? (Math.max(0.5, speed) / rig.stride) * strideMul : mode === 'swim' ? 0.9 : mode === 'celebrate' ? 1.8 : 0.3;
+  // walking and running plant the feet (inverse kinematics); slipping on ice keeps the old skating swing
+  const planted = rig.legs.length > 0 && rig.archetype !== 'ptero' && (mode === 'run' || mode === 'smash' || mode === 'wade' || mode === 'mud' || mode === 'idle');
+  const heavy = mode === 'wade' || mode === 'mud';
+  let gait: GaitState | null = null;
+  let cycle: number;
+  if (planted) {
+    // standing still: feet simply rest on the ground under the hips
+    gait = mode === 'idle' ? { beta: 1, freq: 0.3, stance: 0, run: 0, v: 0 } : gaitFor(rig, speed, heavy);
+    cycle = gait.freq;
+  } else {
+    const strideMul = heavy ? 0.8 : 1;
+    cycle = runLike ? (Math.max(0.5, speed) / rig.stride) * strideMul : mode === 'swim' ? 0.9 : mode === 'celebrate' ? 1.8 : 0.3;
+  }
   rig.phase += cycle * Math.PI * 2 * dt;
   const ph = rig.phase;
   for (const m of rig.animatedMaterials) m.color.setHSL((time * 0.12) % 1, 0.8, 0.72);
@@ -653,9 +666,9 @@ export function animateDino(rig: DinoRig, dt: number, speed: number, mode: DinoA
     return;
   }
 
-  const speedK = runLike ? Math.min(1, speed / 6) : 0;
+  const speedK = gait ? gait.run : runLike ? Math.min(1, speed / 6) : 0;
   const legK = (rig.quadruped ? 0.42 : 0.55) * (mode === 'wade' || mode === 'mud' ? 0.75 : 1) * (0.35 + 0.65 * speedK);
-  for (const leg of rig.legs) {
+  for (const leg of planted ? [] : rig.legs) {
     const s = Math.sin(ph + leg.phase);
     const c = Math.cos(ph + leg.phase);
     let [a1, a2, a3] = leg.rest;
@@ -699,7 +712,7 @@ export function animateDino(rig: DinoRig, dt: number, speed: number, mode: DinoA
   let tailAmp = 0.12;
   let tailFreq = 1;
   let jawOpen = 0.04;
-  const bob = rig.quadruped ? Math.sin(ph * 2) * 0.03 * speedK : Math.abs(Math.sin(ph)) * 0.08 * speedK;
+  const bob = gait ? gaitBob(rig, gait, ph) : rig.quadruped ? Math.sin(ph * 2) * 0.03 * speedK : Math.abs(Math.sin(ph)) * 0.08 * speedK;
   y += runLike ? bob - (rig.quadruped ? 0 : 0.04 * speedK) : 0;
   switch (mode) {
     case 'idle':
@@ -752,6 +765,7 @@ export function animateDino(rig: DinoRig, dt: number, speed: number, mode: DinoA
   rig.hips.position.y = y;
   rig.hips.rotation.x = pitch + (runLike && !rig.quadruped ? -0.04 * speedK : 0);
   rig.hips.rotation.z = roll;
+  if (gait) solveLegs(rig, gait, ph, heavy ? 0.6 : 1);
   // spine: tail sways in a travelling wave, neck counters the bob
   rig.tail.forEach((t, i) => {
     t.rotation.y = Math.sin(ph * tailFreq - i * 0.75) * tailAmp * (0.45 + i * 0.28);

@@ -212,7 +212,7 @@ export interface WorldDefinition {
   ground2: number;
   /** UI card gradient. */
   cardColors: [string, string];
-  weather?: 'none' | 'smoke' | 'snow' | 'sparkle' | 'rain';
+  weather?: 'none' | 'smoke' | 'snow' | 'sparkle' | 'rain' | 'storm';
 }
 
 // ---------------------------------------------------------------------------
@@ -455,9 +455,14 @@ export type TrackStyle = 'flow' | 'rhythm' | 'endurance' | 'teach';
 /** Landscape style of a race: a world, or a map region with its own scenery. */
 export type SceneryId = WorldId | 'swamp' | 'canyon';
 
+/** Time of day of a race: changes the sky, light and life around the track. */
+export type TimeOfDay = 'day' | 'sunset' | 'night';
+
 export type WorldLook = Partial<Pick<WorldDefinition, 'sky' | 'fog' | 'fogNear' | 'fogFar' | 'ambient' | 'sun' | 'sunIntensity' | 'ground' | 'ground2' | 'weather'>> & {
   /** Scenery builder (plants, rocks, mountains, animals); defaults to the world's. */
   scenery?: SceneryId;
+  /** Day (default), sunset or night. */
+  time?: TimeOfDay;
 };
 
 export type RaceContext = { kind: 'campaign'; levelId: string } | { kind: 'daily'; key: string };

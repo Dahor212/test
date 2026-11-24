@@ -225,6 +225,27 @@ const PLACES: Record<RegionId, PlaceSpec[]> = {
   ],
 };
 
+/**
+ * Time of day and storms: most places race in daylight, some at sunset
+ * (warm low sun, long shadows), some at night (moon, stars, fireflies,
+ * lanterns along the trail) and the swamp champion in a thunderstorm.
+ */
+const SKY: Record<string, WorldLook> = {
+  'jungle-4': { time: 'sunset' },
+  'jungle-5': { time: 'sunset' },
+  'swamp-4': { time: 'night' },
+  'swamp-5': { weather: 'storm' },
+  'canyon-3': { time: 'sunset' },
+  'canyon-5': { time: 'sunset' },
+  'ice-2': { time: 'night' },
+  'ice-4': { time: 'sunset' },
+  'volcano-4': { time: 'night' },
+  'volcano-5': { time: 'night' },
+  'islands-2': { time: 'sunset' },
+  'islands-4': { time: 'night' },
+  'islands-5': { weather: 'storm', time: 'sunset' },
+};
+
 /** Where each region is entered from (the last place of the region before). */
 const ENTRY: Record<RegionId, RegionId[]> = {
   jungle: [],
@@ -275,7 +296,7 @@ function buildLevels(): CampaignLevel[] {
         trexFactor: pl.mode === 'trex' ? (pl.boss ? 1.045 + step * 0.004 : 1) : 1,
         seed: hashString(`career:${id}`) % 1_000_000,
         terrainPool: pl.pool ?? reg.terrainPool,
-        look: { ...(reg.look ?? {}), ...(pl.look ?? {}) },
+        look: { ...(reg.look ?? {}), ...(pl.look ?? {}), ...(SKY[id] ?? {}) },
         goals: pl.goals ?? race({ kind: 'perfects', value: 2 }),
         style: DESIGN[id]?.style ?? 'flow',
         focus: DESIGN[id]?.focus,

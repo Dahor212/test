@@ -27,7 +27,8 @@ export type SfxName =
   | 'buy'
   | 'trex'
   | 'event'
-  | 'team';
+  | 'team'
+  | 'thunder';
 
 const NOTES: Record<string, number> = {};
 const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -220,6 +221,11 @@ class SoundEngine {
       case 'event':
         this.tone(N('A4'), t, 0.15, 'triangle', 0.14, null);
         this.tone(N('D5'), t + 0.15, 0.25, 'triangle', 0.14, null);
+        break;
+      case 'thunder':
+        // distant, soft rumble (never a sharp bang)
+        this.noise(t, 2.2, 0.32, 'lowpass', 420, 60, 0.7);
+        this.noise(t + 0.15, 1.4, 0.18, 'lowpass', 260, 50, 0.7);
         break;
       case 'team':
         [N('D5'), N('F#5'), N('A5'), N('D6')].forEach((f, i) => this.tone(f, t + i * 0.05, 0.3, 'sine', 0.14, null));

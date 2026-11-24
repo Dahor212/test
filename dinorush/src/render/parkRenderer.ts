@@ -286,7 +286,7 @@ export class ParkRenderer {
       while (dy > Math.PI) dy -= Math.PI * 2;
       while (dy < -Math.PI) dy += Math.PI * 2;
       r.rotation.y += dy * Math.min(1, dt * 5);
-      animateDino(w.rig, dt, speed * 2.6, 'run', this.time);
+      animateDino(w.rig, dt, speed, 'run', this.time);
     }
     if (this.highlight.selected !== null) this.marker.scale.setScalar(TILE * 0.5 * (1 + Math.sin(this.time * 6) * 0.06));
     this.particles.update(dt);

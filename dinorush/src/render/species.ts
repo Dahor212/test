@@ -268,9 +268,10 @@ function stego(p: DinoPalette): DinoRig {
   const frontDrop = legDrop(frontL, frontRest) + 0.07;
   rig.hipHeight = hindDrop;
   for (const side of [-1, 1]) {
-    const hind = quadLeg(side, [side * 0.4, 0.2, 0.26], hindL, 0.165, hindRest, p, false, em, skin, 3);
+    // the body sits 0.2 higher (see below): the hip joints sit lower so the feet reach the ground
+    const hind = quadLeg(side, [side * 0.4, -0.26, 0.26], hindL, 0.165, hindRest, p, false, em, skin, 3);
     hind.phase = side > 0 ? 0 : Math.PI;
-    const front = quadLeg(side, [side * 0.38, frontDrop - hindDrop + 0.22, -0.82], frontL, 0.13, frontRest, p, true, em, skin, 5);
+    const front = quadLeg(side, [side * 0.38, frontDrop - hindDrop - 0.26, -0.82], frontL, 0.13, frontRest, p, true, em, skin, 5);
     front.phase = side > 0 ? Math.PI : 0;
     rig.hips.add(hind.hip, front.hip);
     rig.legs.push(hind, front);
@@ -404,9 +405,9 @@ function brachio(p: DinoPalette): DinoRig {
   const frontDrop = legDrop(frontL, frontRest) + 0.07;
   rig.hipHeight = hindDrop;
   for (const side of [-1, 1]) {
-    const hind = quadLeg(side, [side * 0.36, 0.08, 0.36], hindL, 0.17, hindRest, p, false, em, skin, 3);
+    const hind = quadLeg(side, [side * 0.36, -0.14, 0.36], hindL, 0.17, hindRest, p, false, em, skin, 3);
     hind.phase = side > 0 ? 0 : Math.PI;
-    const front = quadLeg(side, [side * 0.38, frontDrop - hindDrop + 0.12, -0.5], frontL, 0.16, frontRest, p, true, em, skin, 4);
+    const front = quadLeg(side, [side * 0.38, frontDrop - hindDrop - 0.14, -0.5], frontL, 0.16, frontRest, p, true, em, skin, 4);
     front.phase = side > 0 ? Math.PI : 0;
     rig.hips.add(hind.hip, front.hip);
     rig.legs.push(hind, front);

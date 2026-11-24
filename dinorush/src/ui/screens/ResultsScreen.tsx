@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { EXPLORER_LEVELS, FOSSILS, goalIcon, goalText, LEVEL_BY_ID, REGIONS, ROLE_MILESTONES } from '../../config/campaign';
 import { ARCHETYPE_INFO, DINO_BY_ID } from '../../config/dinosaurs';
 import { dailySpec, formatDailyValue } from '../../progression/daily';
 import { MODES } from '../../config/modes';
 import { sound } from '../../audio/sound';
 import { store, useApp } from '../../state/store';
+import { PodiumStage } from '../../render/podium';
 import type { ParticipantResult } from '../../types';
 import { Button, CoinCounter, DinoIcon, DinoThumb, formatTime, GoalList, Icon, Stars } from '../components/common';
 
@@ -22,6 +23,34 @@ function useCountUp(target: number, ms = 1200) {
     return () => cancelAnimationFrame(raf);
   }, [target, ms]);
   return v;
+}
+
+/**
+ * The three best dinosaurs stand on the podium in 3D and celebrate.
+ * Falls back to still pictures if WebGL is not available.
+ */
+function usePodiumStage(podium: ParticipantResult[]) {
+  const ref = useRef<HTMLDivElement>(null);
+  const settings = useApp((s) => s.settings);
+  const [failed, setFailed] = useState(false);
+  const key = podium.map((r) => `${r.place}:${favouriteDino(r)}`).join(',');
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || failed) return;
+    let stage: PodiumStage | null = null;
+    try {
+      const entries = podium
+        .map((r) => ({ defId: favouriteDino(r), place: r.place, block: el.querySelector<HTMLElement>(`[data-testid="podium-${r.place}"] .podium-block`) }))
+        .filter((e): e is { defId: string; place: number; block: HTMLElement } => !!e.block && !!DINO_BY_ID[e.defId]);
+      stage = new PodiumStage(el, entries, { quality: settings.quality, reducedMotion: settings.reducedMotion });
+      stage.start();
+    } catch {
+      setFailed(true);
+    }
+    return () => stage?.dispose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, failed]);
+  return { ref, failed };
 }
 
 function mainValue(r: ParticipantResult, ranking: string): string {
@@ -48,10 +77,12 @@ export function ResultsScreen() {
     sound.play('victory');
   }, []);
   const totalCoins = useCountUp(last?.rewards.totalCoins ?? 0);
+  const podiumOrder = last ? [last.result.results[1], last.result.results[0], last.result.results[2]].filter(Boolean) : [];
+  const stage3d = usePodiumStage(podiumOrder);
   if (!last) return null;
   const { result, rewards } = last;
   const mode = MODES[result.config.mode];
-  const podium = [result.results[1], result.results[0], result.results[2]].filter(Boolean);
+  const podium = podiumOrder;
   const heights = { 1: 150, 2: 110, 3: 80 } as Record<number, number>;
   const camp = last.campaign;
   const level = camp ? LEVEL_BY_ID[camp.levelId] : null;
@@ -178,14 +209,16 @@ export function ResultsScreen() {
               <Icon name="team" size={30} /> Tým: {formatTime(result.teamTime)} · Ptéro: {formatTime(result.rivalTime)} · Body: {result.teamScore}
             </div>
           )}
-          <div className="podium">
+          <div className={'podium' + (stage3d.failed ? '' : ' podium-3d')} ref={stage3d.ref}>
             {podium.map((r) => (
               <div key={r.id} className={`podium-col place-${r.place}`} data-testid={`podium-${r.place}`}>
-                <DinoThumb defId={favouriteDino(r)} accessory={null} size={r.place === 1 ? 130 : 105} />
+                {stage3d.failed && <DinoThumb defId={favouriteDino(r)} accessory={null} size={r.place === 1 ? 130 : 105} />}
                 <div className="podium-name" style={{ color: r.color }}>
                   {r.name}
                 </div>
                 <Stars count={r.stars} size={r.place === 1 ? 26 : 20} />
+                {/* room for the 3D dinosaur standing on its block */}
+                {!stage3d.failed && <div className="podium-dino" style={{ height: r.place === 1 ? 130 : 105 }} />}
                 <div className="podium-block" style={{ height: heights[r.place] ?? 70 }}>
                   <span>{r.place}.</span>
                   <small>{mainValue(r, mode.ranking)}</small>

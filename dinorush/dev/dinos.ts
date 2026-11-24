@@ -19,6 +19,9 @@ sun.position.set(-4, 8, 5);
 scene.add(sun);
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x7ac74f }));
 scene.add(ground);
+// ?move=1: the dinosaurs really run across a grid, so sliding feet would show
+const move = q.has('move');
+if (move) scene.add(new THREE.GridHelper(400, 400, 0x2f6b1f, 0x4e8f35));
 const ids = (q.get('ids') ?? 'raptor-green,spino-blue,ankylo-orange,trike-purple').split(',');
 const rigs: DinoRig[] = ids.map((id, i) => {
   const rig = id === 'trex' ? createTrex() : id === 'ptero' ? createPtero() : createDinoFromDef(id, q.get('acc'));
@@ -33,14 +36,38 @@ cam.position.set(0, Number(q.get('camy') ?? 2.6), dist);
 cam.lookAt(0, Number(q.get('look') ?? 1.1), 0);
 let t = Number(q.get('t') ?? 0.4);
 let last = performance.now();
+const speed = Number(q.get('speed') ?? 11);
+const fwd = new THREE.Vector3();
+function step(dt: number) {
+  t += dt;
+  for (const rig of rigs) {
+    animateDino(rig, dt, speed, mode, t);
+    if (move) {
+      rig.root.getWorldDirection(fwd);
+      // models face -Z, getWorldDirection returns +Z of the object
+      rig.root.position.addScaledVector(fwd, -speed * dt);
+    }
+  }
+  if (move) {
+    const x = rigs.reduce((a, rg) => a + rg.root.position.x, 0) / rigs.length;
+    const z = rigs.reduce((a, rg) => a + rg.root.position.z, 0) / rigs.length;
+    cam.position.set(x, Number(q.get('camy') ?? 2.6), z + dist);
+    cam.lookAt(x, Number(q.get('look') ?? 1.1), z);
+  }
+}
 function frame(now: number) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
-  t += dt;
-  for (const rig of rigs) animateDino(rig, dt, Number(q.get('speed') ?? 11), mode, t);
+  step(dt);
   r.render(scene, cam);
   requestAnimationFrame(frame);
 }
 for (const rig of rigs) animateDino(rig, 0.25, 11, mode, t);
-requestAnimationFrame(frame);
+// ?manual=1: frames are stepped from outside (deterministic film strips)
+(window as unknown as { __advance: (s: number) => void }).__advance = (s: number) => {
+  for (let k = 0; k < Math.round(s * 240); k++) step(1 / 240);
+  r.render(scene, cam);
+};
+if (!q.has('manual')) requestAnimationFrame(frame);
+else r.render(scene, cam);
 (window as unknown as { __ready: boolean }).__ready = true;

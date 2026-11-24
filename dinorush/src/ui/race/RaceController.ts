@@ -32,6 +32,10 @@ export class RaceController {
   private resizeObs: ResizeObserver | null = null;
   private finishNotified = false;
   private readonly timeScale = debugTimeScale();
+  /** Slow motion as the last human runs through the finish (real seconds since it started). */
+  private slowmoAt: number | null = null;
+  private slowmoDone = false;
+  private container: HTMLElement;
   onFinished: (() => void) | null = null;
   onPauseChange: ((p: boolean) => void) | null = null;
   /** Hook to adjust the engine before each update (tutorial). */
@@ -50,6 +54,7 @@ export class RaceController {
     ghost: { data: GhostData | null; record: boolean } = { data: null, record: false },
   ) {
     this.engine = new RaceEngine(config, participants);
+    this.container = container;
     this.ghost = ghost.data ? new GhostPlayer(ghost.data) : null;
     const humans = participants.filter((p) => p.kind === 'human');
     if (ghost.record && humans.length === 1) {
@@ -97,16 +102,21 @@ export class RaceController {
       this.last = now;
       if (!this.paused) {
         this.beforeUpdate?.();
+        const slow = this.slowmo(dt);
+        const sdt = dt * slow;
         // debug time-scale runs extra fixed steps (the engine clamps each update)
-        let events = this.engine.update(dt);
-        for (let k = 1; k < this.timeScale; k++) events = events.concat(this.engine.update(dt));
+        let events = this.engine.update(sdt);
+        for (let k = 1; k < this.timeScale; k++) events = events.concat(this.engine.update(sdt));
         if (events.length) {
           this.renderer.handleEvents(events);
           sound.handleRaceEvents(events, (id) => !!id && this.engine.participant(id)?.kind === 'human');
           for (const l of this.listeners) l(events);
         }
-        this.renderer.render(dt);
-        if (this.engine.state.phase === 'finished' && !this.finishNotified) {
+        this.renderer.render(sdt, dt);
+        if (this.renderer.thunderNow) sound.play('thunder');
+        // results wait until the slow-motion finish has played
+        const slowing = this.slowmoAt !== null && !this.slowmoDone;
+        if (this.engine.state.phase === 'finished' && !this.finishNotified && !slowing) {
           this.finishNotified = true;
           window.setTimeout(() => !this.disposed && this.onFinished?.(), 1800);
         }
@@ -114,6 +124,38 @@ export class RaceController {
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
+  }
+
+  /**
+   * Slow-motion finish: when the last human still racing is about to cross
+   * the line, time runs at a quarter for a moment and the camera watches
+   * from beside the finish arch. Results are unchanged: the simulation uses
+   * fixed steps, only fewer of them run per real second.
+   */
+  private slowmo(dt: number): number {
+    const s = this.engine.state;
+    if (this.slowmoDone) return 1;
+    if (this.slowmoAt === null) {
+      if (s.phase !== 'racing' || s.track.endless || !this.engine.mode.hasFinish) return 1;
+      const racing = s.participants.filter((p) => p.kind === 'human' && !p.finished && !p.caught);
+      if (!racing.length || s.participants.every((p) => p.kind !== 'human')) return 1;
+      const close = racing.every((p) => (s.track.length - p.position) / Math.max(p.speed, 1) < 0.5);
+      if (!close) return 1;
+      this.slowmoAt = 0;
+      const last = racing.reduce((a, b) => (a.position < b.position ? a : b));
+      this.renderer.startFinishCam(last.id);
+      this.container.classList.add('slowmo');
+    }
+    this.slowmoAt += dt;
+    const t = this.slowmoAt;
+    const HOLD = 1.5;
+    const OUT = 0.6;
+    if (t >= HOLD + OUT) {
+      this.container.classList.remove('slowmo');
+      this.slowmoDone = true;
+      return 1;
+    }
+    return t < HOLD ? 0.25 : 0.25 + (0.75 * (t - HOLD)) / OUT;
   }
 
   /** The recorded run of the (single) human, if it reached the finish. */
